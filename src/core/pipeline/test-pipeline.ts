@@ -16,7 +16,7 @@ const test1Pipeline = Pipeline.start<string>()
     console.log(`  Output: "${result}"`);
     return result;
   }))
-  .add('length', createStep<string, number>('length', async ({ input }) => {
+  .add('length', createStep<string, number, { uppercase: string }>('length', async ({ input }) => {
     console.log(`  Input: "${input}"`);
     const result = input.length;
     console.log(`  Output: ${result}`);
@@ -144,11 +144,11 @@ const test4Pipeline = Pipeline.start<string>()
     console.log(`  Step 1: Processing "${input}"`);
     return input.length;
   }))
-  .add('step2', createStep<number, number>('step2', async ({ input }) => {
+  .add('step2', createStep<number, number, { step1: number }>('step2', async ({ input }) => {
     console.log(`  Step 2: About to throw error`);
     throw new Error('Intentional test error');
   }))
-  .add('step3', createStep<number, string>('step3', async ({ input }) => {
+  .add('step3', createStep<number, string, { step1: number; step2: number }>('step3', async ({ input }) => {
     console.log(`  Step 3: This should not execute`);
     return `Result: ${input}`;
   }));
