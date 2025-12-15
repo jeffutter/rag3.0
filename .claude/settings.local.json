@@ -2,7 +2,15 @@
   "permissions": {
     "allow": [
       "Bash(nix develop:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(curl:*)",
+      "Bash(LOG_LEVEL=debug bun run:*)",
+      "Bash(bun pm:*)",
+      "Bash(bun run:*)",
+      "WebSearch",
+      "WebFetch(domain:zod.dev)",
+      "Bash(bun remove:*)",
+      "Bash(bun start:*)"
     ],
     "deny": [],
     "ask": []

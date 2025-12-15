@@ -9,7 +9,7 @@ import type {
   ToolDefinition
 } from './types';
 import { createLogger } from '../core/logging/logger';
-import { zodToJsonSchema } from 'zod-to-json-schema';
+import { z } from 'zod';
 
 const logger = createLogger('llm-client');
 
@@ -39,14 +39,28 @@ export class OpenAICompatibleClient implements LLMClient {
   }
 
   async complete(options: CompletionOptions): Promise<CompletionResponse> {
-    const tools = options.tools?.map(tool => ({
-      type: 'function' as const,
-      function: {
-        name: tool.name,
-        description: tool.description,
-        parameters: zodToJsonSchema(tool.parameters as any, { target: 'openAi' }) as Record<string, unknown>
-      }
-    }));
+    const tools = options.tools?.map(tool => {
+      // Use Zod v4's native JSON Schema conversion with OpenAPI 3.0 target
+      const jsonSchema = z.toJSONSchema(tool.parameters as any, {
+        target: 'openapi-3.0',
+        unrepresentable: 'any'  // Handle unsupported types gracefully
+      }) as Record<string, unknown>;
+
+      logger.debug({
+        event: 'tool_schema_generated',
+        toolName: tool.name,
+        jsonSchema: jsonSchema
+      });
+
+      return {
+        type: 'function' as const,
+        function: {
+          name: tool.name,
+          description: tool.description,
+          parameters: jsonSchema
+        }
+      };
+    });
 
     const createParams: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming = {
       model: options.model,
@@ -133,8 +147,24 @@ export class OpenAICompatibleClient implements LLMClient {
 
       // If no tool calls, we're done
       if (!lastResponse.message.toolCalls?.length) {
+        logger.debug({
+          event: 'no_tool_calls',
+          iteration: i + 1,
+          finishReason: lastResponse.finishReason
+        });
         return lastResponse;
       }
+
+      logger.debug({
+        event: 'tool_calls_received',
+        iteration: i + 1,
+        toolCallCount: lastResponse.message.toolCalls.length,
+        toolCalls: lastResponse.message.toolCalls.map(tc => ({
+          id: tc.id,
+          name: tc.name,
+          arguments: tc.arguments
+        }))
+      });
 
       // Add assistant message with tool calls
       messages.push(lastResponse.message);
@@ -146,7 +176,8 @@ export class OpenAICompatibleClient implements LLMClient {
         if (!tool) {
           logger.error({
             event: 'unknown_tool_call',
-            toolName: toolCall.name
+            toolName: toolCall.name,
+            availableTools: options.tools?.map(t => t.name)
           });
           messages.push({
             role: 'tool',
@@ -157,16 +188,31 @@ export class OpenAICompatibleClient implements LLMClient {
         }
 
         try {
+          logger.debug({
+            event: 'tool_validation_start',
+            toolName: tool.name,
+            rawArguments: toolCall.arguments
+          });
+
           // Validate arguments against schema
           const validatedArgs = tool.parameters.parse(toolCall.arguments);
 
           logger.info({
             event: 'tool_execution_start',
             toolName: tool.name,
-            arguments: validatedArgs
+            validatedArguments: validatedArgs
           });
 
           const result = await tool.execute(validatedArgs);
+
+          logger.debug({
+            event: 'tool_execution_result',
+            toolName: tool.name,
+            resultType: typeof result,
+            resultIsArray: Array.isArray(result),
+            resultLength: Array.isArray(result) ? result.length : undefined,
+            result: result
+          });
 
           logger.info({
             event: 'tool_execution_complete',
@@ -174,16 +220,25 @@ export class OpenAICompatibleClient implements LLMClient {
             resultType: typeof result
           });
 
+          const toolResultContent = JSON.stringify(result);
+          logger.debug({
+            event: 'tool_result_message',
+            toolCallId: toolCall.id,
+            contentLength: toolResultContent.length,
+            contentPreview: toolResultContent.slice(0, 200)
+          });
+
           messages.push({
             role: 'tool',
-            content: JSON.stringify(result),
+            content: toolResultContent,
             toolCallId: toolCall.id
           });
         } catch (error) {
           logger.error({
             event: 'tool_execution_error',
             toolName: tool.name,
-            error: error instanceof Error ? error.message : String(error)
+            error: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined
           });
           messages.push({
             role: 'tool',

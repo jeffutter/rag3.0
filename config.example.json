@@ -1,0 +1,19 @@
+{
+  "llm": {
+    "baseURL": "http://localhost:8080/v1",
+    "model": "qwen2.5:7b",
+    "timeout": 120000
+  },
+  "embedding": {
+    "baseURL": "http://localhost:8080/v1",
+    "model": "nomic-embed-text"
+  },
+  "qdrant": {
+    "url": "http://localhost:6333",
+    "defaultCollection": "rag_store"
+  },
+  "logging": {
+    "level": "info",
+    "pretty": true
+  }
+}
