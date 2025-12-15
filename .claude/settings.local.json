@@ -10,7 +10,8 @@
       "WebSearch",
       "WebFetch(domain:zod.dev)",
       "Bash(bun remove:*)",
-      "Bash(bun start:*)"
+      "Bash(bun start:*)",
+      "Bash(bun add:*)"
     ],
     "deny": [],
     "ask": []

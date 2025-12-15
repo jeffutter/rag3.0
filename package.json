@@ -5,6 +5,8 @@
   "scripts": {
     "start": "bun run src/main.ts",
     "dev": "bun run --hot src/main.ts",
+    "server:mcp": "bun run src/server.ts --mode=mcp",
+    "server:webhook": "bun run src/server.ts --mode=webhook",
     "build": "bun build ./src/main.ts --compile --outfile dist/llm-orchestrator",
     "test": "bun test",
     "test-cli": "bun run src/test-cli.ts",
@@ -13,6 +15,7 @@
     "generate-bun-nix": "bunx bun2nix"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.24.3",
     "@qdrant/js-client-rest": "^1.16.2",
     "openai": "^6.10.0",
     "pino": "^10.1.0",
