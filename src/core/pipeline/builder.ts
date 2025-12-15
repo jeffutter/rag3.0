@@ -1,32 +1,49 @@
-import type { Step, StepResult, StepMetadata, StepError } from './types';
+import type { Step, StepResult, StepMetadata, StepError, AddToState, StepExecutionContext } from './types';
 import { createLogger } from '../logging/logger';
 
 const logger = createLogger('pipeline');
 
 /**
- * Type-safe pipeline builder using a fluent interface.
+ * Type-safe pipeline builder with accumulated state tracking.
  *
- * The key to compile-time type safety is that each `pipe()` call
- * returns a new Pipeline type that encodes both:
- * - The current output type (which becomes the next input type)
- * - The accumulated context requirements
+ * Key features:
+ * - Each step receives the previous step's output as direct input
+ * - Each step can access outputs from ANY previous step via accumulated state
+ * - TypeScript validates at compile-time that referenced steps exist
+ * - Steps are named, enabling type-safe cross-step references
  *
- * This means TypeScript will catch mismatched step types at compile time,
- * not runtime.
+ * @example
+ * const pipeline = Pipeline.start<string>()
+ *   .add('embed', embeddingStep)      // state: { embed: EmbeddingOutput }
+ *   .add('search', vectorSearchStep)  // Can reference state.embed
+ *   .add('rerank', rerankStep);       // Can reference state.embed and state.search
  */
 
 // Internal representation of a pipeline stage
-interface PipelineStage<TIn, TOut, TCtx> {
-  step: Step<TIn, TOut, TCtx>;
+interface PipelineStage {
+  key: string;
+  step: Step<any, any, any, any>;
 }
 
-// The Pipeline class with generic type tracking
-export class Pipeline<TInput, TOutput, TContext> {
-  private stages: PipelineStage<any, any, any>[] = [];
+/**
+ * Pipeline class with generic type tracking.
+ *
+ * @template TInitialInput - The very first input to the pipeline
+ * @template TCurrentOutput - The output of the most recent step
+ * @template TAccumulatedState - Object containing all previous step outputs by name
+ * @template TContext - Additional runtime context
+ */
+export class Pipeline<
+  TInitialInput,
+  TCurrentOutput,
+  TAccumulatedState extends Record<string, any>,
+  TContext = unknown
+> {
+  private stages: PipelineStage[] = [];
   private contextBuilder: () => TContext;
 
   private constructor(
-    stages: PipelineStage<any, any, any>[],
+    stages: PipelineStage[],
     contextBuilder: () => TContext
   ) {
     this.stages = stages;
@@ -34,69 +51,100 @@ export class Pipeline<TInput, TOutput, TContext> {
   }
 
   /**
-   * Create a new pipeline starting with an initial step.
+   * Start a new pipeline.
    *
    * @example
-   * const pipeline = Pipeline.create(embeddingStep);
+   * const pipeline = Pipeline.start<string>()
+   *   .add('step1', step1)
+   *   .add('step2', step2);
    */
-  static create<I, O, C>(
-    step: Step<I, O, C>,
-    contextBuilder: () => C
-  ): Pipeline<I, O, C> {
-    return new Pipeline([{ step }], contextBuilder);
+  static start<TInput, TContext = unknown>(
+    contextBuilder: () => TContext = (() => ({} as TContext))
+  ): Pipeline<TInput, TInput, {}, TContext> {
+    return new Pipeline<TInput, TInput, {}, TContext>([], contextBuilder);
   }
 
   /**
-   * Add a step to the pipeline.
+   * Add a named step to the pipeline.
    *
-   * TypeScript enforces that NextIn === TOutput at compile time.
-   * If you try to pipe a step that expects a different input type,
-   * you'll get a compile error.
+   * The step receives:
+   * - input: The direct output from the previous step
+   * - state: All outputs from previous steps (by their keys)
+   * - context: Runtime context
+   *
+   * TypeScript enforces:
+   * - Input type matches previous step's output
+   * - State type contains all previously added steps
+   * - No duplicate step names
    *
    * @example
    * pipeline
-   *   .pipe(vectorSearchStep)  // Output: SearchResults
-   *   .pipe(rerankStep)        // Input must be SearchResults
+   *   .add('embed', createStep('embed', async ({ input }) => {
+   *     return embedText(input);
+   *   }))
+   *   .add('search', createStep('search', async ({ input, state }) => {
+   *     // input is the embedding from previous step
+   *     // state.embed is also available
+   *     return searchVectors(input, state.embed);
+   *   }));
    */
-  pipe<NextOut, NextCtx>(
-    step: Step<TOutput, NextOut, TContext & NextCtx>
-  ): Pipeline<TInput, NextOut, TContext & NextCtx> {
+  add<TKey extends string, TNextOutput>(
+    key: TKey,
+    step: Step<TCurrentOutput, TNextOutput, TAccumulatedState, TContext>
+  ): TKey extends keyof TAccumulatedState
+    ? never
+    : Pipeline<
+        TInitialInput,
+        TNextOutput,
+        AddToState<TAccumulatedState, TKey, TNextOutput>,
+        TContext
+      > {
     return new Pipeline(
-      [...this.stages, { step }],
-      this.contextBuilder as () => TContext & NextCtx
-    );
+      [...this.stages, { key, step }],
+      this.contextBuilder
+    ) as any;
   }
 
   /**
    * Add a conditional branch to the pipeline.
    * Both branches must have the same output type.
    */
-  branch<BranchOut>(
-    condition: (input: TOutput, context: TContext) => boolean,
-    trueBranch: Step<TOutput, BranchOut, TContext>,
-    falseBranch: Step<TOutput, BranchOut, TContext>
-  ): Pipeline<TInput, BranchOut, TContext> {
-    const branchStep: Step<TOutput, BranchOut, TContext> = {
+  branch<TKey extends string, TBranchOutput>(
+    key: TKey,
+    condition: (input: TCurrentOutput, state: TAccumulatedState, context: TContext) => boolean,
+    trueBranch: Step<TCurrentOutput, TBranchOutput, TAccumulatedState, TContext>,
+    falseBranch: Step<TCurrentOutput, TBranchOutput, TAccumulatedState, TContext>
+  ): TKey extends keyof TAccumulatedState
+    ? never
+    : Pipeline<
+        TInitialInput,
+        TBranchOutput,
+        AddToState<TAccumulatedState, TKey, TBranchOutput>,
+        TContext
+      > {
+    const branchStep: Step<TCurrentOutput, TBranchOutput, TAccumulatedState, TContext> = {
       name: `branch(${trueBranch.name}|${falseBranch.name})`,
-      execute: async (input, context) => {
-        const selectedStep = condition(input, context) ? trueBranch : falseBranch;
-        return selectedStep.execute(input, context);
+      execute: async (ctx) => {
+        const selectedStep = condition(ctx.input, ctx.state, ctx.context) ? trueBranch : falseBranch;
+        return selectedStep.execute(ctx);
       }
     };
+
     return new Pipeline(
-      [...this.stages, { step: branchStep }],
+      [...this.stages, { key, step: branchStep }],
       this.contextBuilder
-    );
+    ) as any;
   }
 
   /**
    * Execute the pipeline with the given input.
    */
-  async execute(input: TInput): Promise<StepResult<TOutput>> {
+  async execute(input: TInitialInput): Promise<StepResult<TCurrentOutput>> {
     const context = this.contextBuilder();
     const traceId = crypto.randomUUID();
 
     let currentData: any = input;
+    const accumulatedState: any = {};
 
     for (const stage of this.stages) {
       const startTime = performance.now();
@@ -107,6 +155,7 @@ export class Pipeline<TInput, TOutput, TContext> {
         traceId,
         spanId,
         stepName: stage.step.name,
+        stepKey: stage.key,
         inputType: typeof currentData
       });
 
@@ -114,6 +163,7 @@ export class Pipeline<TInput, TOutput, TContext> {
         const result = await this.executeWithRetry(
           stage.step,
           currentData,
+          accumulatedState,
           context,
           traceId,
           spanId
@@ -135,6 +185,7 @@ export class Pipeline<TInput, TOutput, TContext> {
             traceId,
             spanId,
             stepName: stage.step.name,
+            stepKey: stage.key,
             error: result.error,
             durationMs: metadata.durationMs
           });
@@ -146,9 +197,12 @@ export class Pipeline<TInput, TOutput, TContext> {
           traceId,
           spanId,
           stepName: stage.step.name,
+          stepKey: stage.key,
           durationMs: metadata.durationMs
         });
 
+        // Store in accumulated state
+        accumulatedState[stage.key] = result.data;
         currentData = result.data;
       } catch (error) {
         const endTime = performance.now();
@@ -176,7 +230,7 @@ export class Pipeline<TInput, TOutput, TContext> {
 
     return {
       success: true,
-      data: currentData as TOutput,
+      data: currentData as TCurrentOutput,
       metadata: {
         stepName: 'pipeline_complete',
         startTime: 0,
@@ -187,9 +241,10 @@ export class Pipeline<TInput, TOutput, TContext> {
     };
   }
 
-  private async executeWithRetry<I, O, C>(
-    step: Step<I, O, C>,
+  private async executeWithRetry<I, O, S, C>(
+    step: Step<I, O, S, C>,
     input: I,
+    state: S,
     context: C,
     traceId: string,
     spanId: string
@@ -200,7 +255,8 @@ export class Pipeline<TInput, TOutput, TContext> {
     let lastResult: StepResult<O> | null = null;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      lastResult = await step.execute(input, context);
+      const ctx: StepExecutionContext<I, S, C> = { input, state, context };
+      lastResult = await step.execute(ctx);
 
       if (lastResult.success) {
         return lastResult;

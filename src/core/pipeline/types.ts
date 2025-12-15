@@ -1,10 +1,11 @@
 /**
  * Core pipeline types enabling compile-time type safety for workflow composition.
  *
- * Key insight: We use TypeScript's type inference to ensure that:
+ * Key insights:
  * 1. Each step's input type matches the previous step's output type
- * 2. Required context is accumulated and validated at compile time
- * 3. Tool definitions are type-safe
+ * 2. Steps can access outputs from ANY previous step via accumulated state
+ * 3. TypeScript validates at compile-time that referenced steps exist
+ * 4. Type-safe tool definitions
  */
 
 // Base result type for all pipeline steps
@@ -34,10 +35,29 @@ export interface StepError {
   retryable: boolean;
 }
 
-// Step definition - the building block of pipelines
-export interface Step<TInput, TOutput, TContext = unknown> {
+/**
+ * Step execution context containing:
+ * - input: The direct output from the previous step
+ * - state: Accumulated outputs from ALL previous steps (by name)
+ * - context: Additional runtime context
+ */
+export interface StepExecutionContext<TInput, TAccumulatedState, TContext = unknown> {
+  input: TInput;
+  state: TAccumulatedState;
+  context: TContext;
+}
+
+/**
+ * Step definition - the building block of pipelines.
+ *
+ * @template TInput - The direct input type (output of previous step)
+ * @template TOutput - The output type of this step
+ * @template TAccumulatedState - Object containing all previous step outputs
+ * @template TContext - Additional runtime context
+ */
+export interface Step<TInput, TOutput, TAccumulatedState = Record<string, never>, TContext = unknown> {
   name: string;
-  execute: (input: TInput, context: TContext) => Promise<StepResult<TOutput>>;
+  execute: (ctx: StepExecutionContext<TInput, TAccumulatedState, TContext>) => Promise<StepResult<TOutput>>;
   // Optional retry configuration
   retry?: {
     maxAttempts: number;
@@ -46,18 +66,23 @@ export interface Step<TInput, TOutput, TContext = unknown> {
   };
 }
 
-// Pipeline builder types for compile-time safety
-export type PipelineStep<TIn, TOut, TCtx> = {
-  step: Step<TIn, TOut, TCtx>;
-  inputType: TIn;
-  outputType: TOut;
-};
-
 // Extracts the output type from a step
-export type StepOutput<S> = S extends Step<any, infer O, any> ? O : never;
+export type StepOutput<S> = S extends Step<any, infer O, any, any> ? O : never;
 
 // Extracts the input type from a step
-export type StepInput<S> = S extends Step<infer I, any, any> ? I : never;
+export type StepInput<S> = S extends Step<infer I, any, any, any> ? I : never;
 
-// Context accumulator type
-export type MergeContext<A, B> = A & B;
+// Extracts the accumulated state type from a step
+export type StepAccumulatedState<S> = S extends Step<any, any, infer A, any> ? A : never;
+
+// Helper to merge accumulated state with a new step's output
+export type AddToState<TState, TKey extends string, TValue> = TState & Record<TKey, TValue>;
+
+// Helper to check if a key already exists in the accumulated state
+// This prevents duplicate step names at compile time
+export type KeyExists<TState, TKey extends string> =
+  TKey extends keyof TState ? true : false;
+
+// Helper to validate a new key doesn't exist
+export type ValidateNewKey<TState, TKey extends string> =
+  KeyExists<TState, TKey> extends true ? never : TKey;

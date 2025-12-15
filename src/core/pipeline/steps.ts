@@ -1,12 +1,32 @@
-import type { Step, StepResult, StepError } from './types';
+import type { Step, StepResult, StepError, StepExecutionContext } from './types';
 
 /**
  * Helper functions for creating type-safe steps.
  */
 
-export function createStep<TInput, TOutput, TContext = unknown>(
+/**
+ * Create a type-safe pipeline step.
+ *
+ * The execute function receives a context object with:
+ * - input: The direct output from the previous step
+ * - state: Accumulated outputs from all previous steps (by name)
+ * - context: Additional runtime context
+ *
+ * @example
+ * const step = createStep<string, number, { prevStep: string }>('myStep', async ({ input, state, context }) => {
+ *   // input is a string
+ *   // state.prevStep is available and typed correctly
+ *   return input.length;
+ * });
+ */
+export function createStep<
+  TInput,
+  TOutput,
+  TAccumulatedState = Record<string, never>,
+  TContext = unknown
+>(
   name: string,
-  execute: (input: TInput, context: TContext) => Promise<TOutput>,
+  execute: (ctx: StepExecutionContext<TInput, TAccumulatedState, TContext>) => Promise<TOutput>,
   options?: {
     retry?: {
       maxAttempts: number;
@@ -14,12 +34,12 @@ export function createStep<TInput, TOutput, TContext = unknown>(
       retryableErrors?: string[];
     };
   }
-): Step<TInput, TOutput, TContext> {
-  const step: Step<TInput, TOutput, TContext> = {
+): Step<TInput, TOutput, TAccumulatedState, TContext> {
+  const step: Step<TInput, TOutput, TAccumulatedState, TContext> = {
     name,
-    execute: async (input, context): Promise<StepResult<TOutput>> => {
+    execute: async (ctx): Promise<StepResult<TOutput>> => {
       try {
-        const data = await execute(input, context);
+        const data = await execute(ctx);
         return {
           success: true,
           data,
@@ -31,11 +51,24 @@ export function createStep<TInput, TOutput, TContext = unknown>(
           }
         };
       } catch (error) {
+        // Extract error code - prefer explicit code property, fall back to message for common error patterns
+        let errorCode = 'STEP_ERROR';
+        const errorMessage = error instanceof Error ? error.message : String(error);
+
+        if (error instanceof Error && 'code' in error) {
+          errorCode = String((error as any).code);
+        } else if (error instanceof Error) {
+          // Check if error message matches common error codes
+          const knownErrors = ['ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED', 'RATE_LIMIT'];
+          const matchedCode = knownErrors.find(code => errorMessage.includes(code));
+          if (matchedCode) {
+            errorCode = matchedCode;
+          }
+        }
+
         const stepError: StepError = {
-          code: error instanceof Error && 'code' in error
-            ? String((error as any).code)
-            : 'STEP_ERROR',
-          message: error instanceof Error ? error.message : String(error),
+          code: errorCode,
+          message: errorMessage,
           cause: error,
           retryable: isRetryableError(error)
         };
@@ -79,24 +112,35 @@ function isRetryableError(error: unknown): boolean {
 
 /**
  * Create a passthrough step that transforms data without async operations.
+ *
+ * @example
+ * const upperCase = createTransform('upperCase', (input: string) => input.toUpperCase());
  */
-export function createTransform<TInput, TOutput>(
+export function createTransform<TInput, TOutput, TAccumulatedState = Record<string, never>>(
   name: string,
-  transform: (input: TInput) => TOutput
-): Step<TInput, TOutput, unknown> {
-  return createStep(name, async (input) => transform(input));
+  transform: (input: TInput, state: TAccumulatedState) => TOutput
+): Step<TInput, TOutput, TAccumulatedState, unknown> {
+  return createStep(name, async ({ input, state }) => transform(input, state));
 }
 
 /**
  * Create a step that runs multiple sub-steps in parallel.
+ *
+ * @example
+ * const parallel = createParallel('fetchAll', [step1, step2, step3]);
  */
-export function createParallel<TInput, TOutputs extends readonly unknown[]>(
+export function createParallel<
+  TInput,
+  TOutputs extends readonly unknown[],
+  TAccumulatedState = Record<string, never>,
+  TContext = unknown
+>(
   name: string,
-  steps: { [K in keyof TOutputs]: Step<TInput, TOutputs[K], unknown> }
-): Step<TInput, TOutputs, unknown> {
-  return createStep(name, async (input) => {
+  steps: { [K in keyof TOutputs]: Step<TInput, TOutputs[K], TAccumulatedState, TContext> }
+): Step<TInput, TOutputs, TAccumulatedState, TContext> {
+  return createStep(name, async (ctx) => {
     const results = await Promise.all(
-      steps.map(step => step.execute(input, {}))
+      steps.map(step => step.execute(ctx))
     );
 
     // Check for failures
