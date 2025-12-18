@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import type { ToolDefinition } from '../llm/types';
 
 /**

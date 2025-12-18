@@ -121,12 +121,22 @@ async function main() {
       });
     } else {
       logger.info({ event: 'starting_webhook_server' });
-      await runWebhookServer({
+      const webhookOptions: {
+        pipelineRegistry: PipelineRegistry;
+        port: number;
+        host: string;
+        apiKey?: string;
+      } = {
         pipelineRegistry,
-        port: parseInt(process.env.WEBHOOK_PORT || '3000'),
-        host: process.env.WEBHOOK_HOST || '0.0.0.0',
-        apiKey: process.env.WEBHOOK_API_KEY
-      });
+        port: parseInt(process.env.WEBHOOK_PORT || '3000', 10),
+        host: process.env.WEBHOOK_HOST || '0.0.0.0'
+      };
+
+      if (process.env.WEBHOOK_API_KEY) {
+        webhookOptions.apiKey = process.env.WEBHOOK_API_KEY;
+      }
+
+      await runWebhookServer(webhookOptions);
     }
 
   } catch (error) {

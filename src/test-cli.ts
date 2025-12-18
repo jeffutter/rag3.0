@@ -42,9 +42,11 @@ const cliInputStep = createStep<string, string>(
 interface LLMContext {
   llmClient: OpenAICompatibleClient;
   model: string;
+  // biome-ignore lint/suspicious/noExplicitAny: Tools can have various argument types
   tools: ToolDefinition<any>[];
 }
 
+// biome-ignore lint/complexity/noBannedTypes: Empty state for first step in pipeline
 const llmStep = createStep<string, CompletionResponse, {}, LLMContext>(
   'llm_call',
   async ({ input, context }) => {
@@ -185,6 +187,7 @@ Note: The LLM will automatically decide whether to use the RAG search tool based
     defaultCollection: QDRANT_COLLECTION
   });
 
+  // biome-ignore lint/suspicious/noExplicitAny: Tools can have various argument types
   const tools: ToolDefinition<any>[] = [ragTool];
 
   // Build the pipeline

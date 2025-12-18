@@ -11,7 +11,9 @@
       "WebFetch(domain:zod.dev)",
       "Bash(bun remove:*)",
       "Bash(bun start:*)",
-      "Bash(bun add:*)"
+      "Bash(bun add:*)",
+      "Bash(bun typecheck:*)",
+      "Bash(biome lint:*)"
     ],
     "deny": [],
     "ask": []

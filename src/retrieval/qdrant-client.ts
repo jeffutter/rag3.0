@@ -4,6 +4,7 @@ import { createLogger } from '../core/logging/logger';
 const logger = createLogger('qdrant');
 
 // Type for Qdrant filters
+// biome-ignore lint/suspicious/noExplicitAny: Qdrant client doesn't export filter types
 type QdrantFilter = any; // We'll use any for now since the types aren't exported
 
 export interface SearchOptions {
@@ -58,6 +59,7 @@ export class VectorSearchClient {
     });
 
     try {
+      // biome-ignore lint/suspicious/noExplicitAny: Qdrant client doesn't export search params type
       const searchParams: any = {
         vector,
         limit: options.limit || 10,

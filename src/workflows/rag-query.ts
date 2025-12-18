@@ -2,8 +2,8 @@ import { z } from 'zod';
 import { Pipeline } from '../core/pipeline/builder';
 import { createStep } from '../core/pipeline/steps';
 import type { RegisteredPipeline } from '../core/pipeline/registry';
-import { OpenAICompatibleClient } from '../llm/openai-client';
-import { VectorSearchClient } from '../retrieval/qdrant-client';
+import type { OpenAICompatibleClient } from '../llm/openai-client';
+import type { VectorSearchClient } from '../retrieval/qdrant-client';
 import { createRAGSearchTool } from '../tools/rag-search';
 import type { CompletionResponse } from '../llm/types';
 
@@ -58,11 +58,12 @@ export type RAGQueryOutput = z.infer<typeof ragQueryOutputSchema>;
  */
 export function createRAGQueryPipeline(
   contextBuilder: () => RAGQueryPipelineContext
-): Pipeline<RAGQueryInput, RAGQueryOutput, RAGQueryPipelineContext> {
+) {
   // Step 1: Execute LLM with RAG tool
   const llmStep = createStep<
     RAGQueryInput,
     CompletionResponse,
+    // biome-ignore lint/complexity/noBannedTypes: Empty state for first step in pipeline
     {},
     RAGQueryPipelineContext
   >(
@@ -82,7 +83,8 @@ export function createRAGQueryPipeline(
           { role: 'system', content: systemPrompt },
           { role: 'user', content: input.query }
         ],
-        tools: [ragTool],
+        // biome-ignore lint/suspicious/noExplicitAny: Tool type inference issue between defineTool and ToolDefinition
+        tools: [ragTool as any],
         toolChoice: 'auto',
         temperature: 0.7
       }, 5);

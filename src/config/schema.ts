@@ -4,7 +4,7 @@ export const configSchema = z.object({
   server: z.object({
     port: z.number().default(3000),
     host: z.string().default('0.0.0.0')
-  }).default({}),
+  }).default({ port: 3000, host: '0.0.0.0' }),
 
   llm: z.object({
     baseURL: z.string(),
@@ -28,7 +28,7 @@ export const configSchema = z.object({
   logging: z.object({
     level: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
     pretty: z.boolean().default(false)
-  }).default({})
+  }).default({ level: 'info', pretty: false })
 });
 
 export type Config = z.infer<typeof configSchema>;
@@ -53,7 +53,7 @@ export async function loadConfig(path?: string): Promise<Config> {
       const raw = await file.json();
       return configSchema.parse(raw);
     }
-  } catch (error) {
+  } catch (_error) {
     // File doesn't exist or is invalid, fall through to env vars
   }
 
@@ -76,7 +76,7 @@ export async function loadConfig(path?: string): Promise<Config> {
         defaultCollection: process.env.QDRANT_COLLECTION
       },
       logging: {
-        level: process.env.LOG_LEVEL as any || 'info',
+        level: (process.env.LOG_LEVEL as 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal' | undefined) || 'info',
         pretty: process.env.NODE_ENV !== 'production'
       }
     });

@@ -56,6 +56,7 @@ export function createStep<
         const errorMessage = error instanceof Error ? error.message : String(error);
 
         if (error instanceof Error && 'code' in error) {
+          // biome-ignore lint/suspicious/noExplicitAny: Error.code is not typed in TypeScript
           errorCode = String((error as any).code);
         } else if (error instanceof Error) {
           // Check if error message matches common error codes

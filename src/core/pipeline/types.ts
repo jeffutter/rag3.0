@@ -67,12 +67,15 @@ export interface Step<TInput, TOutput, TAccumulatedState = Record<string, never>
 }
 
 // Extracts the output type from a step
+// biome-ignore lint/suspicious/noExplicitAny: Type utility requires any for proper type inference
 export type StepOutput<S> = S extends Step<any, infer O, any, any> ? O : never;
 
 // Extracts the input type from a step
+// biome-ignore lint/suspicious/noExplicitAny: Type utility requires any for proper type inference
 export type StepInput<S> = S extends Step<infer I, any, any, any> ? I : never;
 
 // Extracts the accumulated state type from a step
+// biome-ignore lint/suspicious/noExplicitAny: Type utility requires any for proper type inference
 export type StepAccumulatedState<S> = S extends Step<any, any, infer A, any> ? A : never;
 
 // Helper to merge accumulated state with a new step's output

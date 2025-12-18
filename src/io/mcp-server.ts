@@ -3,7 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
-  Tool,
+  type Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import type { PipelineRegistry } from '../core/pipeline/registry';
@@ -52,14 +52,22 @@ export function createMCPServer(options: MCPServerOptions) {
 
     const pipelines = pipelineRegistry.getAll();
 
-    const tools: Tool[] = pipelines.map(pipeline => ({
-      name: pipeline.name,
-      description: pipeline.description,
-      inputSchema: z.toJSONSchema(pipeline.inputSchema, {
+    const tools: Tool[] = pipelines.map(pipeline => {
+      const schema = z.toJSONSchema(pipeline.inputSchema, {
         target: 'openapi-3.0',
         unrepresentable: 'any'
-      }) as Record<string, unknown>
-    }));
+        // biome-ignore lint/suspicious/noExplicitAny: Zod's toJSONSchema returns unknown type
+      }) as any;
+
+      return {
+        name: pipeline.name,
+        description: pipeline.description,
+        inputSchema: {
+          type: 'object' as const,
+          ...schema
+        }
+      };
+    });
 
     logger.info({
       event: 'list_tools_response',

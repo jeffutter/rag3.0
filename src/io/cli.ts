@@ -1,4 +1,4 @@
-import { parseArgs } from 'util';
+import { parseArgs } from 'node:util';
 import { createLogger } from '../core/logging/logger';
 import type { LLMClient } from '../llm/types';
 import type { ToolDefinition } from '../llm/types';
@@ -36,7 +36,7 @@ export async function runCLI(options: CLIOptions) {
 
   const systemPrompt = options.systemPrompt || `You are a helpful assistant with access to a knowledge base. Use the available tools to answer user questions accurately.`;
 
-  if (values.query) {
+  if (values.query && typeof values.query === 'string') {
     // Single query mode with -q flag
     await processQuery(options, systemPrompt, values.query);
   } else if (values.interactive) {
@@ -110,8 +110,8 @@ async function runInteractive(
   options: CLIOptions,
   systemPrompt: string
 ) {
-  const messages = [
-    { role: 'system' as const, content: systemPrompt }
+  const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+    { role: 'system', content: systemPrompt }
   ];
 
   console.log('=== Interactive Mode ===');
@@ -158,7 +158,7 @@ async function runInteractive(
 
         messages.push(response.message);
 
-        console.log('\n' + response.message.content + '\n');
+        console.log(`\n${response.message.content}\n`);
       } catch (error) {
         console.error('Error:', error instanceof Error ? error.message : String(error));
       }

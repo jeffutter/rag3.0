@@ -125,15 +125,20 @@ export function createWebhookServer(options: WebhookServerOptions) {
           const result = await pipelineRegistry.execute(pipelineName, input);
           const executionTime = performance.now() - startTime;
 
-          const response: WebhookExecutionResult = {
-            success: result.success,
-            pipelineName,
-            executionTime,
-            ...(result.success
-              ? { data: result.data }
-              : { error: result.error }
-            )
-          };
+          const response: WebhookExecutionResult = result.success
+            ? {
+                success: true,
+                pipelineName,
+                executionTime,
+                data: result.data
+              }
+            : {
+                success: false,
+                pipelineName,
+                executionTime,
+                // biome-ignore lint/style/noNonNullAssertion: result.error is guaranteed to exist when success is false
+                error: result.error!
+              };
 
           logger.info({
             event: 'webhook_execution_complete',

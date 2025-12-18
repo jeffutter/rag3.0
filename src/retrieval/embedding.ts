@@ -1,5 +1,4 @@
 import { createStep } from '../core/pipeline/steps';
-import type { LLMClient } from '../llm/types';
 import { createLogger } from '../core/logging/logger';
 
 const logger = createLogger('embedding');

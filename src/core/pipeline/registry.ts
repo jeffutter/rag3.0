@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import type { z } from 'zod';
 import type { Pipeline } from './builder';
 
 /**
@@ -11,7 +11,8 @@ export interface RegisteredPipeline<TInput = unknown, TOutput = unknown, TContex
   description: string;
   inputSchema: z.ZodType<TInput>;
   outputSchema: z.ZodType<TOutput>;
-  pipeline: Pipeline<TInput, TOutput, TContext>;
+  // biome-ignore lint/suspicious/noExplicitAny: Pipeline state type is dynamic and varies per pipeline
+  pipeline: Pipeline<TInput, TOutput, any, TContext>;
   contextBuilder: () => TContext;
   tags?: string[];
   examples?: Array<{ input: TInput; description: string }>;

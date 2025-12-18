@@ -22,6 +22,7 @@ const logger = createLogger('pipeline');
 // Internal representation of a pipeline stage
 interface PipelineStage {
   key: string;
+  // biome-ignore lint/suspicious/noExplicitAny: Internal type-erased storage for pipeline stages
   step: Step<any, any, any, any>;
 }
 
@@ -36,6 +37,7 @@ interface PipelineStage {
 export class Pipeline<
   TInitialInput,
   TCurrentOutput,
+  // biome-ignore lint/suspicious/noExplicitAny: Generic constraint allows any value type in accumulated state
   TAccumulatedState extends Record<string, any>,
   TContext = unknown
 > {
@@ -60,7 +62,9 @@ export class Pipeline<
    */
   static start<TInput, TContext = unknown>(
     contextBuilder: () => TContext = (() => ({} as TContext))
+    // biome-ignore lint/complexity/noBannedTypes: Empty object represents initial empty pipeline state
   ): Pipeline<TInput, TInput, {}, TContext> {
+    // biome-ignore lint/complexity/noBannedTypes: Empty object represents initial empty pipeline state
     return new Pipeline<TInput, TInput, {}, TContext>([], contextBuilder);
   }
 
@@ -102,6 +106,7 @@ export class Pipeline<
     return new Pipeline(
       [...this.stages, { key, step }],
       this.contextBuilder
+      // biome-ignore lint/suspicious/noExplicitAny: TypeScript cannot infer complex conditional return type
     ) as any;
   }
 
@@ -133,6 +138,7 @@ export class Pipeline<
     return new Pipeline(
       [...this.stages, { key, step: branchStep }],
       this.contextBuilder
+      // biome-ignore lint/suspicious/noExplicitAny: TypeScript cannot infer complex conditional return type
     ) as any;
   }
 
@@ -143,7 +149,9 @@ export class Pipeline<
     const context = this.contextBuilder();
     const traceId = crypto.randomUUID();
 
+    // biome-ignore lint/suspicious/noExplicitAny: Runtime type erasure requires any for dynamic data flow
     let currentData: any = input;
+    // biome-ignore lint/suspicious/noExplicitAny: Runtime type erasure requires any for accumulated state
     const accumulatedState: any = {};
 
     for (const stage of this.stages) {
@@ -285,6 +293,7 @@ export class Pipeline<
       await Bun.sleep(backoffMs * attempt);
     }
 
+    // biome-ignore lint/style/noNonNullAssertion: lastResult is guaranteed to be set after loop
     return lastResult!;
   }
 }

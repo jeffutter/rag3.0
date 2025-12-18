@@ -4,9 +4,7 @@ import type {
   CompletionOptions,
   CompletionResponse,
   Message,
-  AssistantMessage,
-  ToolCall,
-  ToolDefinition
+  AssistantMessage
 } from './types';
 import { createLogger } from '../core/logging/logger';
 import { z } from 'zod';
@@ -41,6 +39,7 @@ export class OpenAICompatibleClient implements LLMClient {
   async complete(options: CompletionOptions): Promise<CompletionResponse> {
     const tools = options.tools?.map(tool => {
       // Use Zod v4's native JSON Schema conversion with OpenAPI 3.0 target
+      // biome-ignore lint/suspicious/noExplicitAny: Zod's ZodType needs casting for toJSONSchema
       const jsonSchema = z.toJSONSchema(tool.parameters as any, {
         target: 'openapi-3.0',
         unrepresentable: 'any'  // Handle unsupported types gracefully
@@ -256,6 +255,7 @@ export class OpenAICompatibleClient implements LLMClient {
       maxIterations
     });
 
+    // biome-ignore lint/style/noNonNullAssertion: lastResponse is guaranteed to be set after loop
     return lastResponse!;
   }
 
@@ -293,6 +293,7 @@ export class OpenAICompatibleClient implements LLMClient {
           return {
             role: 'tool',
             content: msg.content,
+            // biome-ignore lint/style/noNonNullAssertion: toolCallId is required for tool messages
             tool_call_id: msg.toolCallId!
           };
         default:
