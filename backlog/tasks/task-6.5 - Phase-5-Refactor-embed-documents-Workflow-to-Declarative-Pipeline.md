@@ -1,10 +1,10 @@
 ---
 id: task-6.5
 title: 'Phase 5: Refactor embed-documents Workflow to Declarative Pipeline'
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2025-12-21 14:22'
-updated_date: '2025-12-21 14:22'
+updated_date: '2025-12-21 22:36'
 labels:
   - workflow
   - refactoring
