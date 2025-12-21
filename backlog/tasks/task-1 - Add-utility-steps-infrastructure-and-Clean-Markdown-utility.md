@@ -4,7 +4,7 @@ title: Add utility steps infrastructure and Clean Markdown utility
 status: To Do
 assignee: []
 created_date: '2025-12-21 03:39'
-updated_date: '2025-12-21 03:41'
+updated_date: '2025-12-21 04:12'
 labels: []
 dependencies: []
 priority: medium
@@ -197,4 +197,83 @@ return {
 - **Tag parsing**: Handle empty strings, comma-separated strings, and arrays from frontmatter
 - **Formatting removal**: Remove emphasis, strong, and delete nodes while preserving their text children
 - **Do NOT remove**: Links and inline code (these were intentionally excluded in the reference)
+
+## Enhanced Implementation Details
+
+### Pipeline Integration Pattern
+
+Based on the existing pipeline infrastructure in src/core/pipeline/, the Clean Markdown step should:
+
+1. **Use the `createStep` helper** from src/core/pipeline/steps.ts:
+```typescript
+import { createStep } from '../../core/pipeline/steps';
+import type { StepResult } from '../../core/pipeline/types';
+import { z } from 'zod';
+```
+
+2. **Define Zod schemas for input/output**:
+```typescript
+const CleanMarkdownInputSchema = z.object({
+  content: z.string(),
+  headingsToRemove: z.array(z.string()).optional().default([
+    'Project List', 'Due Today', 'Todoist Tasks', 'Daily Reading',
+    'Completed Today', 'Habit', 'Jira Tickets', 'Task', 'Bullet', 'File'
+  ])
+});
+
+const CleanMarkdownOutputSchema = z.object({
+  content: z.string(),
+  tags: z.array(z.string()),
+  frontmatter: z.record(z.any()).optional()
+});
+
+type CleanMarkdownInput = z.infer<typeof CleanMarkdownInputSchema>;
+type CleanMarkdownOutput = z.infer<typeof CleanMarkdownOutputSchema>;
+```
+
+3. **Create the step using the pipeline pattern**:
+```typescript
+export const cleanMarkdownStep = createStep<CleanMarkdownInput, CleanMarkdownOutput>(
+  'cleanMarkdown',
+  async ({ input }) => {
+    // Validate input
+    const validated = CleanMarkdownInputSchema.parse(input);
+    
+    // Implementation here
+    
+    return {
+      content: cleanedContent,
+      tags: parsedTags,
+      frontmatter: parsed.data
+    };
+  }
+);
+```
+
+4. **Error handling**: The `createStep` wrapper automatically catches errors and returns proper StepResult, so focus on business logic
+
+5. **Export pattern**: Export both the step and the schemas for testing and composition
+
+### Dependencies Installation
+
+```bash
+bun add remark unist-util-visit gray-matter
+bun add -d @types/unist
+```
+
+### File Structure to Create
+
+```
+src/steps/
+  utilities/
+    clean-markdown.ts      # Main implementation
+    index.ts               # Barrel export
+```
+
+### Verification Steps
+
+1. Create a simple test file to verify the step works with the pipeline system
+2. Ensure the step can be imported and used in pipeline composition
+3. Verify input validation works correctly
+4. Test the StepResult success/failure paths
 <!-- SECTION:PLAN:END -->
