@@ -4,7 +4,7 @@ title: 'Phase 3: Pipeline Builder Extensions (map, flatMap, batch, etc.)'
 status: In Progress
 assignee: []
 created_date: '2025-12-21 14:22'
-updated_date: '2025-12-21 21:12'
+updated_date: '2025-12-21 21:46'
 labels:
   - architecture
   - pipeline
@@ -67,14 +67,14 @@ This is Phase 3 of the pipeline architecture refactoring (parent: task-6).
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Pipeline.map() method implemented with full type safety
-- [ ] #2 Pipeline.flatMap() method implemented
-- [ ] #3 Pipeline.batch() method implemented
-- [ ] #4 Pipeline.flatten() method implemented
-- [ ] #5 Pipeline.filter() method implemented
-- [ ] #6 All methods support options parameter where applicable
-- [ ] #7 Type inference works correctly through complex chains
-- [ ] #8 Compile-time errors for invalid operations (e.g., map on non-array)
-- [ ] #9 Test file pipeline-builder-lists.test.ts validates all methods
-- [ ] #10 Accumulated state correctly typed for downstream steps
+- [x] #1 Pipeline.map() method implemented with full type safety
+- [x] #2 Pipeline.flatMap() method implemented
+- [x] #3 Pipeline.batch() method implemented
+- [x] #4 Pipeline.flatten() method implemented
+- [x] #5 Pipeline.filter() method implemented
+- [x] #6 All methods support options parameter where applicable
+- [x] #7 Type inference works correctly through complex chains
+- [x] #8 Compile-time errors for invalid operations (e.g., map on non-array)
+- [x] #9 Test file pipeline-builder-lists.test.ts validates all methods
+- [x] #10 Accumulated state correctly typed for downstream steps
 <!-- AC:END -->
