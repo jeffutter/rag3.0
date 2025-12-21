@@ -1,7 +1,7 @@
 ---
 id: task-6.3
 title: 'Phase 3: Pipeline Builder Extensions (map, flatMap, batch, etc.)'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2025-12-21 14:22'
 updated_date: '2025-12-21 21:46'
