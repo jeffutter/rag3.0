@@ -1,10 +1,10 @@
 ---
 id: task-3
 title: Create Split Markdown utility step for embedding chunks
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-12-21 03:51'
-updated_date: '2025-12-21 04:27'
+updated_date: '2025-12-21 04:38'
 labels: []
 dependencies: []
 priority: medium
@@ -30,22 +30,22 @@ The utility should integrate with our pipeline system and support batch processi
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Utility step is created at src/steps/utilities/split-markdown.ts
-- [ ] #2 Required dependencies are added: @langchain/textsplitters and any crypto/uuid libraries needed
-- [ ] #3 Input schema includes: content (string), optional minChunkSize (default 300), optional maxChunkSize (default 1000), optional chunkOverlap (default 100), and optional metadata object
-- [ ] #4 Output schema returns array of chunks with: id (UUID), content (string), metadata (object), index (number), length (number)
-- [ ] #5 Two-stage splitting implemented: markdown-aware initial split, then character-based refinement
-- [ ] #6 Chunks smaller than minChunkSize are preserved as-is
-- [ ] #7 Chunks larger than maxChunkSize are further split with overlap
-- [ ] #8 Chunks between min and max size are preserved as-is
-- [ ] #9 UUID generation is deterministic using SHA-256 hash of source string
-- [ ] #10 Chunk UUIDs encode both source document and chunk index (0-255)
-- [ ] #11 Chunk validation filters out: empty/whitespace-only content, markdown fences (``` or ~~~), punctuation-only content, standalone headings with no body text
-- [ ] #12 Step follows the Step<TInput, TOutput> interface pattern
-- [ ] #13 Input and output types are properly defined with Zod schemas
-- [ ] #14 Comprehensive unit tests are created in src/steps/utilities/split-markdown.test.ts
-- [ ] #15 Tests verify: splitting behavior with various chunk sizes, UUID generation is deterministic, chunk validation rules, metadata preservation, edge cases (empty content, single line, very large documents)
-- [ ] #16 All tests pass when running 'bun test'
+- [x] #1 Utility step is created at src/steps/utilities/split-markdown.ts
+- [x] #2 Required dependencies are added: @langchain/textsplitters and any crypto/uuid libraries needed
+- [x] #3 Input schema includes: content (string), optional minChunkSize (default 300), optional maxChunkSize (default 1000), optional chunkOverlap (default 100), and optional metadata object
+- [x] #4 Output schema returns array of chunks with: id (UUID), content (string), metadata (object), index (number), length (number)
+- [x] #5 Two-stage splitting implemented: markdown-aware initial split, then character-based refinement
+- [x] #6 Chunks smaller than minChunkSize are preserved as-is
+- [x] #7 Chunks larger than maxChunkSize are further split with overlap
+- [x] #8 Chunks between min and max size are preserved as-is
+- [x] #9 UUID generation is deterministic using SHA-256 hash of source string
+- [x] #10 Chunk UUIDs encode both source document and chunk index (0-255)
+- [x] #11 Chunk validation filters out: empty/whitespace-only content, markdown fences (``` or ~~~), punctuation-only content, standalone headings with no body text
+- [x] #12 Step follows the Step<TInput, TOutput> interface pattern
+- [x] #13 Input and output types are properly defined with Zod schemas
+- [x] #14 Comprehensive unit tests are created in src/steps/utilities/split-markdown.test.ts
+- [x] #15 Tests verify: splitting behavior with various chunk sizes, UUID generation is deterministic, chunk validation rules, metadata preservation, edge cases (empty content, single line, very large documents)
+- [x] #16 All tests pass when running 'bun test'
 <!-- AC:END -->
 
 ## Implementation Plan
