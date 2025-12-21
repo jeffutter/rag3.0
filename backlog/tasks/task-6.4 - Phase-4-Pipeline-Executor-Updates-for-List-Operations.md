@@ -4,11 +4,13 @@ title: 'Phase 4: Pipeline Executor Updates for List Operations'
 status: To Do
 assignee: []
 created_date: '2025-12-21 14:22'
+updated_date: '2025-12-21 14:22'
 labels:
   - architecture
   - pipeline
   - performance
-dependencies: []
+dependencies:
+  - task-6.3
 parent_task_id: task-6
 priority: high
 ---
