@@ -4,11 +4,14 @@ title: 'Phase 8: Documentation Polish and Final Cleanup'
 status: To Do
 assignee: []
 created_date: '2025-12-21 14:22'
+updated_date: '2025-12-21 14:22'
 labels:
   - documentation
   - cleanup
   - polish
-dependencies: []
+dependencies:
+  - task-6.6
+  - task-6.7
 parent_task_id: task-6
 priority: medium
 ---
