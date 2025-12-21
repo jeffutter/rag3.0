@@ -4,7 +4,7 @@ title: 'Phase 2: Step Adapter Utilities for List Processing'
 status: In Progress
 assignee: []
 created_date: '2025-12-21 14:22'
-updated_date: '2025-12-21 21:11'
+updated_date: '2025-12-21 21:12'
 labels:
   - architecture
   - utilities
@@ -58,13 +58,13 @@ This is Phase 2 of the pipeline architecture refactoring (parent: task-6).
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 New file src/core/pipeline/list-adapters.ts with adapter functions
-- [ ] #2 singleToList adapter correctly wraps single-item steps
-- [ ] #3 ListErrorStrategy enum with FAIL_FAST, COLLECT_ERRORS, SKIP_FAILED
-- [ ] #4 PartialListResult type for partial success scenarios
-- [ ] #5 createBatchStep, createFlattenStep, createFilterStep helpers implemented
-- [ ] #6 Test file list-adapters.test.ts with comprehensive adapter tests
-- [ ] #7 Error handling works correctly for all three strategies
-- [ ] #8 Metadata preservation verified through tests
-- [ ] #9 Parallel execution option works correctly
+- [x] #1 New file src/core/pipeline/list-adapters.ts with adapter functions
+- [x] #2 singleToList adapter correctly wraps single-item steps
+- [x] #3 ListErrorStrategy enum with FAIL_FAST, COLLECT_ERRORS, SKIP_FAILED
+- [x] #4 PartialListResult type for partial success scenarios
+- [x] #5 createBatchStep, createFlattenStep, createFilterStep helpers implemented
+- [x] #6 Test file list-adapters.test.ts with comprehensive adapter tests
+- [x] #7 Error handling works correctly for all three strategies
+- [x] #8 Metadata preservation verified through tests
+- [x] #9 Parallel execution option works correctly
 <!-- AC:END -->
