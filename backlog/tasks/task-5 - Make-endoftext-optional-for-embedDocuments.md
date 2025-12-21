@@ -1,10 +1,10 @@
 ---
 id: task-5
 title: Make <|endoftext|> optional for embedDocuments
-status: In Progress
+status: Done
 assignee: []
 created_date: '2025-12-21 06:12'
-updated_date: '2025-12-21 13:39'
+updated_date: '2025-12-21 13:41'
 labels: []
 dependencies: []
 ---
