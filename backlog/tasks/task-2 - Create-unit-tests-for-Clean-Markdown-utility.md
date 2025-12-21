@@ -1,10 +1,10 @@
 ---
 id: task-2
 title: Create unit tests for Clean Markdown utility
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-12-21 03:43'
-updated_date: '2025-12-21 03:43'
+updated_date: '2025-12-21 04:26'
 labels: []
 dependencies:
   - task-1
@@ -31,20 +31,20 @@ Use Bun's built-in test runner which provides `test()`, `describe()`, and `expec
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Test file created at src/steps/utilities/clean-markdown.test.ts
-- [ ] #2 Tests verify heading removal removes heading AND content until next same/higher level heading
-- [ ] #3 Tests verify all default headings from the list are removed correctly
-- [ ] #4 Tests verify custom headings list can be passed and works correctly
-- [ ] #5 Tests verify text formatting removal (bold, italic, strikethrough) while preserving text content
-- [ ] #6 Tests verify links and inline code are preserved (not removed)
-- [ ] #7 Tests verify tag parsing handles empty strings correctly
-- [ ] #8 Tests verify tag parsing handles comma-separated string format
-- [ ] #9 Tests verify tag parsing handles array format from frontmatter
-- [ ] #10 Tests verify behavior with no frontmatter present
-- [ ] #11 Tests verify behavior with empty markdown content
-- [ ] #12 Tests verify nested heading scenarios
-- [ ] #13 All tests pass when running 'bun test'
-- [ ] #14 Test file follows Bun test runner conventions (describe, test, expect)
+- [x] #1 Test file created at src/steps/utilities/clean-markdown.test.ts
+- [x] #2 Tests verify heading removal removes heading AND content until next same/higher level heading
+- [x] #3 Tests verify all default headings from the list are removed correctly
+- [x] #4 Tests verify custom headings list can be passed and works correctly
+- [x] #5 Tests verify text formatting removal (bold, italic, strikethrough) while preserving text content
+- [x] #6 Tests verify links and inline code are preserved (not removed)
+- [x] #7 Tests verify tag parsing handles empty strings correctly
+- [x] #8 Tests verify tag parsing handles comma-separated string format
+- [x] #9 Tests verify tag parsing handles array format from frontmatter
+- [x] #10 Tests verify behavior with no frontmatter present
+- [x] #11 Tests verify behavior with empty markdown content
+- [x] #12 Tests verify nested heading scenarios
+- [x] #13 All tests pass when running 'bun test'
+- [x] #14 Test file follows Bun test runner conventions (describe, test, expect)
 <!-- AC:END -->
 
 ## Implementation Plan
