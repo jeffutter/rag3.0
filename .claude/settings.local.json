@@ -13,13 +13,19 @@
       "Bash(bun start:*)",
       "Bash(bun add:*)",
       "Bash(bun typecheck:*)",
-      "Bash(biome lint:*)"
+      "Bash(biome lint:*)",
+      "mcp__backlog__task_search",
+      "mcp__backlog__task_create",
+      "mcp__backlog__task_edit",
+      "mcp__backlog__get_workflow_overview",
+      "mcp__backlog__task_view",
+      "mcp__backlog__get_task_creation_guide"
     ],
     "deny": [],
     "ask": []
   },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "backlog"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }
