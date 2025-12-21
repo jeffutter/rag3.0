@@ -4,7 +4,7 @@ title: Create Split Markdown utility step for embedding chunks
 status: To Do
 assignee: []
 created_date: '2025-12-21 03:51'
-updated_date: '2025-12-21 03:52'
+updated_date: '2025-12-21 04:27'
 labels: []
 dependencies: []
 priority: medium
@@ -306,4 +306,112 @@ This utility step should:
 - Return proper StepResult (success/failure)
 - Handle errors gracefully (e.g., chunk index > 255)
 - Log warnings for filtered chunks (optional, for debugging)
+
+## Enhanced Implementation Details
+
+### Dependencies
+```bash
+bun add @langchain/textsplitters
+```
+Note: Bun has built-in `crypto` module.
+
+### Pipeline Integration Pattern
+
+```typescript
+import { createStep } from '../../core/pipeline/steps';
+import { z } from 'zod';
+import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
+import { createHash } from 'crypto';
+
+const SplitMarkdownInputSchema = z.object({
+  content: z.string(),
+  source: z.string().optional(),
+  metadata: z.record(z.any()).optional().default({}),
+  minChunkSize: z.number().optional().default(300),
+  maxChunkSize: z.number().optional().default(1000),
+  chunkOverlap: z.number().optional().default(100),
+});
+
+const ChunkSchema = z.object({
+  id: z.string().uuid(),
+  content: z.string(),
+  metadata: z.record(z.any()),
+  index: z.number(),
+  length: z.number(),
+});
+
+const SplitMarkdownOutputSchema = z.object({
+  chunks: z.array(ChunkSchema),
+});
+```
+
+### Step Creation
+
+```typescript
+export const splitMarkdownStep = createStep<SplitMarkdownInput, SplitMarkdownOutput>(
+  'splitMarkdown',
+  async ({ input }) => {
+    const validated = SplitMarkdownInputSchema.parse(input);
+    const chunks = await smartSplitMarkdown(validated.content, {
+      minChunkSize: validated.minChunkSize,
+      maxChunkSize: validated.maxChunkSize,
+      chunkOverlap: validated.chunkOverlap,
+    });
+    
+    const validChunks = chunks
+      .filter(chunk => isValidChunk(chunk.pageContent))
+      .map((chunk, index) => ({
+        id: validated.source ? getChunkUUID(validated.source, index) : crypto.randomUUID(),
+        content: chunk.pageContent,
+        metadata: { ...validated.metadata, ...chunk.metadata },
+        index,
+        length: chunk.pageContent.length,
+      }));
+    
+    return { chunks: validChunks };
+  }
+);
+```
+
+### File Structure
+```
+src/steps/utilities/
+  split-markdown.ts
+  split-markdown.test.ts
+  index.ts (update to export)
+```
+
+## Critical Implementation Notes
+
+### Key Functions to Implement
+
+1. **smartSplitMarkdown**: Two-stage splitting
+   - Stage 1: Markdown-aware (RecursiveCharacterTextSplitter with "markdown")
+   - Stage 2: Character refinement based on size constraints
+
+2. **stringToBaseUUID**: Deterministic UUID from SHA-256 hash
+3. **getChunkUUID**: Modify last byte with chunk index (0-255)
+4. **isValidChunk**: Validate content (no empty, fences, punctuation-only, standalone headings)
+
+### Important Constraints
+
+- **Max 255 chunks** per document (byte limitation)
+- **UUID determinism**: Same source + index = same UUID
+- **Metadata merging**: Input metadata + LangChain metadata
+- **Empty content**: Return empty array (not error)
+- **Index > 255**: Throw error
+
+### Testing Requirements (Per AC #14-16)
+
+1. Splitting: small/medium/large documents
+2. UUID: determinism, sequential indices
+3. Validation: all 4 filter rules
+4. Metadata: preservation and merging
+5. Edge cases: empty, single line, >256 chunks, no source
+
+### Integration
+
+- Works with Clean Markdown step output
+- Proper StepResult handling
+- Type-safe with Zod
 <!-- SECTION:PLAN:END -->
