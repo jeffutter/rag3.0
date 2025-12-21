@@ -1,10 +1,10 @@
 ---
 id: task-1
 title: Add utility steps infrastructure and Clean Markdown utility
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-12-21 03:39'
-updated_date: '2025-12-21 04:12'
+updated_date: '2025-12-21 04:25'
 labels: []
 dependencies: []
 priority: medium
@@ -34,18 +34,18 @@ This is based on an existing n8n workflow that needs to be adapted to work with 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Utility steps folder structure is created at src/steps/utilities/
-- [ ] #2 Clean Markdown utility is implemented as a pipeline step following the Step<TInput, TOutput> interface
-- [ ] #3 Required dependencies (remark, unist-util-visit, gray-matter) are added to package.json
-- [ ] #4 Heading removal removes the heading AND all content until next heading of same/higher level
-- [ ] #5 Default headings list matches reference: Project List, Due Today, Todoist Tasks, Daily Reading, Completed Today, Habit, Jira Tickets, Task, Bullet, File
-- [ ] #6 Headings to remove can be configured via step input parameter
-- [ ] #7 Text formatting removal handles emphasis (italic), strong (bold), and delete (strikethrough) while preserving text content
-- [ ] #8 Links and inline code formatting are preserved (not removed)
+- [x] #1 Utility steps folder structure is created at src/steps/utilities/
+- [x] #2 Clean Markdown utility is implemented as a pipeline step following the Step<TInput, TOutput> interface
+- [x] #3 Required dependencies (remark, unist-util-visit, gray-matter) are added to package.json
+- [x] #4 Heading removal removes the heading AND all content until next heading of same/higher level
+- [x] #5 Default headings list matches reference: Project List, Due Today, Todoist Tasks, Daily Reading, Completed Today, Habit, Jira Tickets, Task, Bullet, File
+- [x] #6 Headings to remove can be configured via step input parameter
+- [x] #7 Text formatting removal handles emphasis (italic), strong (bold), and delete (strikethrough) while preserving text content
+- [x] #8 Links and inline code formatting are preserved (not removed)
 
-- [ ] #9 Tag parsing handles empty strings, comma-separated strings, and array formats from frontmatter
-- [ ] #10 Input and output types are properly defined with Zod schemas for type safety
-- [ ] #11 The utility can be used in workflows like any other pipeline step
+- [x] #9 Tag parsing handles empty strings, comma-separated strings, and array formats from frontmatter
+- [x] #10 Input and output types are properly defined with Zod schemas for type safety
+- [x] #11 The utility can be used in workflows like any other pipeline step
 <!-- AC:END -->
 
 ## Implementation Plan
