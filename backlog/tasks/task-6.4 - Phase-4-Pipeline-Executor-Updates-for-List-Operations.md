@@ -1,10 +1,10 @@
 ---
 id: task-6.4
 title: 'Phase 4: Pipeline Executor Updates for List Operations'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2025-12-21 14:22'
-updated_date: '2025-12-21 21:47'
+updated_date: '2025-12-21 22:35'
 labels:
   - architecture
   - pipeline
@@ -62,13 +62,13 @@ This is Phase 4 of the pipeline architecture refactoring (parent: task-6).
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Pipeline executor detects list operations automatically
-- [ ] #2 executeParallel helper with configurable concurrency limit
-- [ ] #3 FAIL_FAST error strategy stops on first error
-- [ ] #4 COLLECT_ERRORS continues and aggregates all errors
-- [ ] #5 SKIP_FAILED continues and skips failed items
-- [ ] #6 Metadata aggregation includes per-item timing and success rates
-- [ ] #7 Test file pipeline-executor-lists.test.ts validates all strategies
-- [ ] #8 Performance tests show efficient execution for large arrays
-- [ ] #9 No performance regression vs manual loops
+- [x] #1 Pipeline executor detects list operations automatically
+- [x] #2 executeParallel helper with configurable concurrency limit
+- [x] #3 FAIL_FAST error strategy stops on first error
+- [x] #4 COLLECT_ERRORS continues and aggregates all errors
+- [x] #5 SKIP_FAILED continues and skips failed items
+- [x] #6 Metadata aggregation includes per-item timing and success rates
+- [x] #7 Test file pipeline-executor-lists.test.ts validates all strategies
+- [x] #8 Performance tests show efficient execution for large arrays
+- [x] #9 No performance regression vs manual loops
 <!-- AC:END -->
