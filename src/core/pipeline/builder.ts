@@ -1,4 +1,12 @@
 import { createLogger } from "../logging/logger";
+import {
+	createBatchStep,
+	createFilterStep,
+	createFlattenStep,
+	type SingleToListOptions,
+	singleToList,
+} from "./list-adapters";
+import type { ArrayElement } from "./list-types";
 import type {
 	AddToState,
 	Step,
@@ -162,6 +170,251 @@ export class Pipeline<
 
 		return new Pipeline(
 			[...this.stages, { key, step: branchStep }],
+			this.contextBuilder,
+			// biome-ignore lint/suspicious/noExplicitAny: TypeScript cannot infer complex conditional return type
+		) as any;
+	}
+
+	/**
+	 * Map a step over an array.
+	 *
+	 * Applies a single-item step to each element of an array, producing a new array.
+	 * Validates at compile-time that the current output is an array type.
+	 *
+	 * @template TKey - The key to store the result in accumulated state
+	 * @template TOutput - The output type of the mapped step
+	 * @param key - The key for this step in accumulated state
+	 * @param step - A step that operates on single elements
+	 * @param options - Optional configuration for parallel execution and error handling
+	 *
+	 * @example
+	 * pipeline
+	 *   .add('items', getItems) // Returns string[]
+	 *   .map('uppercased', uppercaseStep, { parallel: true })
+	 *   // Now state has: { items: string[], uppercased: string[] }
+	 */
+	map<TKey extends string, TOutput>(
+		key: TKey,
+		step: TCurrentOutput extends (infer TElement)[]
+			? Step<TElement, TOutput, TAccumulatedState, TContext>
+			: never,
+		options?: SingleToListOptions,
+	): TCurrentOutput extends unknown[]
+		? TKey extends keyof TAccumulatedState
+			? never
+			: Pipeline<
+					TInitialInput,
+					TOutput[],
+					AddToState<TAccumulatedState, TKey, TOutput[]>,
+					TContext
+				>
+		: never {
+		// Convert the single-item step to a list step
+		const listStep = singleToList(step, options);
+
+		return new Pipeline(
+			[...this.stages, { key, step: listStep }],
+			this.contextBuilder,
+			// biome-ignore lint/suspicious/noExplicitAny: TypeScript cannot infer complex conditional return type
+		) as any;
+	}
+
+	/**
+	 * FlatMap a step over an array.
+	 *
+	 * Applies a step that returns arrays to each element, then flattens the results.
+	 * Validates at compile-time that the current output is an array type.
+	 *
+	 * @template TKey - The key to store the result in accumulated state
+	 * @template TOutput - The element type of arrays returned by the step
+	 * @param key - The key for this step in accumulated state
+	 * @param step - A step that operates on single elements and returns arrays
+	 * @param options - Optional configuration for parallel execution and error handling
+	 *
+	 * @example
+	 * pipeline
+	 *   .add('sentences', getSentences) // Returns string[]
+	 *   .flatMap('words', splitWordsStep) // Each sentence -> string[]
+	 *   // Now state has: { sentences: string[], words: string[] }
+	 */
+	flatMap<TKey extends string, TOutput>(
+		key: TKey,
+		step: TCurrentOutput extends (infer TElement)[]
+			? Step<TElement, TOutput[], TAccumulatedState, TContext>
+			: never,
+		options?: SingleToListOptions,
+	): TCurrentOutput extends unknown[]
+		? TKey extends keyof TAccumulatedState
+			? never
+			: Pipeline<
+					TInitialInput,
+					TOutput[],
+					AddToState<TAccumulatedState, TKey, TOutput[]>,
+					TContext
+				>
+		: never {
+		// Convert the single-item step to a list step, then flatten
+		const listStep = singleToList(step, options);
+
+		// Wrap the list step to flatten the output
+		const flatMappedStep: Step<
+			TCurrentOutput,
+			TOutput[],
+			TAccumulatedState,
+			TContext
+		> = {
+			name: `${listStep.name}_flatMap`,
+			execute: async (ctx) => {
+				// biome-ignore lint/suspicious/noExplicitAny: Runtime type erasure - ctx.input is guaranteed to be an array at runtime
+				const result = await listStep.execute(ctx as any);
+				if (!result.success) {
+					return result;
+				}
+
+				// Flatten the array of arrays
+				// biome-ignore lint/suspicious/noExplicitAny: Runtime type erasure requires any for nested array flattening
+				const flattened = (result.data as any[][]).flat() as TOutput[];
+
+				return {
+					success: true,
+					data: flattened,
+					metadata: result.metadata,
+				};
+			},
+		};
+
+		if (listStep.retry) {
+			flatMappedStep.retry = listStep.retry;
+		}
+
+		return new Pipeline(
+			[...this.stages, { key, step: flatMappedStep }],
+			this.contextBuilder,
+			// biome-ignore lint/suspicious/noExplicitAny: TypeScript cannot infer complex conditional return type
+		) as any;
+	}
+
+	/**
+	 * Batch an array into chunks.
+	 *
+	 * Transforms T[] into T[][], grouping elements into batches of the specified size.
+	 * Validates at compile-time that the current output is an array type.
+	 *
+	 * @template TKey - The key to store the result in accumulated state
+	 * @param key - The key for this step in accumulated state
+	 * @param size - The number of elements per batch
+	 *
+	 * @example
+	 * pipeline
+	 *   .add('items', getItems) // Returns string[]
+	 *   .batch('batches', 10)
+	 *   // Now state has: { items: string[], batches: string[][] }
+	 */
+	batch<TKey extends string>(
+		key: TKey,
+		size: number,
+	): TCurrentOutput extends (infer TElement)[]
+		? TKey extends keyof TAccumulatedState
+			? never
+			: Pipeline<
+					TInitialInput,
+					TElement[][],
+					AddToState<TAccumulatedState, TKey, TElement[][]>,
+					TContext
+				>
+		: never {
+		const batchStep = createBatchStep<
+			ArrayElement<TCurrentOutput>,
+			TAccumulatedState,
+			TContext
+		>(size, `batch_${size}`);
+
+		return new Pipeline(
+			[...this.stages, { key, step: batchStep }],
+			this.contextBuilder,
+			// biome-ignore lint/suspicious/noExplicitAny: TypeScript cannot infer complex conditional return type
+		) as any;
+	}
+
+	/**
+	 * Flatten a nested array.
+	 *
+	 * Transforms T[][] into T[], flattening one level of nesting.
+	 * Validates at compile-time that the current output is a nested array type.
+	 *
+	 * @template TKey - The key to store the result in accumulated state
+	 * @param key - The key for this step in accumulated state
+	 *
+	 * @example
+	 * pipeline
+	 *   .add('batches', getBatches) // Returns string[][]
+	 *   .flatten('items')
+	 *   // Now state has: { batches: string[][], items: string[] }
+	 */
+	flatten<TKey extends string>(
+		key: TKey,
+	): TCurrentOutput extends (infer TElement)[][]
+		? TKey extends keyof TAccumulatedState
+			? never
+			: Pipeline<
+					TInitialInput,
+					TElement[],
+					AddToState<TAccumulatedState, TKey, TElement[]>,
+					TContext
+				>
+		: never {
+		const flattenStep = createFlattenStep<
+			ArrayElement<ArrayElement<TCurrentOutput>>,
+			TAccumulatedState,
+			TContext
+		>("flatten");
+
+		return new Pipeline(
+			[...this.stages, { key, step: flattenStep }],
+			this.contextBuilder,
+			// biome-ignore lint/suspicious/noExplicitAny: TypeScript cannot infer complex conditional return type
+		) as any;
+	}
+
+	/**
+	 * Filter an array based on a predicate.
+	 *
+	 * Removes elements that don't match the predicate condition.
+	 * Validates at compile-time that the current output is an array type.
+	 *
+	 * @template TKey - The key to store the result in accumulated state
+	 * @param key - The key for this step in accumulated state
+	 * @param predicate - Function to test each element (can be async)
+	 *
+	 * @example
+	 * pipeline
+	 *   .add('numbers', getNumbers) // Returns number[]
+	 *   .filter('evens', (n) => n % 2 === 0)
+	 *   // Now state has: { numbers: number[], evens: number[] }
+	 */
+	filter<TKey extends string>(
+		key: TKey,
+		predicate: TCurrentOutput extends (infer TElement)[]
+			? (item: TElement, index: number) => boolean | Promise<boolean>
+			: never,
+	): TCurrentOutput extends (infer TElement)[]
+		? TKey extends keyof TAccumulatedState
+			? never
+			: Pipeline<
+					TInitialInput,
+					TElement[],
+					AddToState<TAccumulatedState, TKey, TElement[]>,
+					TContext
+				>
+		: never {
+		const filterStep = createFilterStep<
+			ArrayElement<TCurrentOutput>,
+			TAccumulatedState,
+			TContext
+		>(predicate, `filter_${key}`);
+
+		return new Pipeline(
+			[...this.stages, { key, step: filterStep }],
 			this.contextBuilder,
 			// biome-ignore lint/suspicious/noExplicitAny: TypeScript cannot infer complex conditional return type
 		) as any;
