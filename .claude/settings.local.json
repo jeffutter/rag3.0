@@ -17,5 +17,9 @@
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "enabledMcpjsonServers": [
+    "backlog"
+  ],
+  "enableAllProjectMcpServers": true
 }
