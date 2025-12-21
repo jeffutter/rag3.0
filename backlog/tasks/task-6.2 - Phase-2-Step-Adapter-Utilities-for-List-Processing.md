@@ -4,11 +4,13 @@ title: 'Phase 2: Step Adapter Utilities for List Processing'
 status: To Do
 assignee: []
 created_date: '2025-12-21 14:22'
+updated_date: '2025-12-21 14:22'
 labels:
   - architecture
   - utilities
   - pipeline
-dependencies: []
+dependencies:
+  - task-6.1
 parent_task_id: task-6
 priority: high
 ---
