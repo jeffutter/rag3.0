@@ -4,11 +4,13 @@ title: 'Phase 3: Pipeline Builder Extensions (map, flatMap, batch, etc.)'
 status: To Do
 assignee: []
 created_date: '2025-12-21 14:22'
+updated_date: '2025-12-21 14:22'
 labels:
   - architecture
   - pipeline
   - api
-dependencies: []
+dependencies:
+  - task-6.2
 parent_task_id: task-6
 priority: high
 ---
