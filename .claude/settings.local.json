@@ -31,7 +31,9 @@
       "mcp__backlog__task_view",
       "mcp__backlog__task_complete",
       "Bash(chmod:*)",
-      "Bash(biome check:*)"
+      "Bash(biome check:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
