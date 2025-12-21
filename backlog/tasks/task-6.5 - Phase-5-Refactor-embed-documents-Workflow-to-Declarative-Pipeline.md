@@ -4,11 +4,13 @@ title: 'Phase 5: Refactor embed-documents Workflow to Declarative Pipeline'
 status: To Do
 assignee: []
 created_date: '2025-12-21 14:22'
+updated_date: '2025-12-21 14:22'
 labels:
   - workflow
   - refactoring
   - embedding
-dependencies: []
+dependencies:
+  - task-6.4
 parent_task_id: task-6
 priority: high
 ---
