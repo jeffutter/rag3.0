@@ -1,10 +1,10 @@
 ---
 id: task-4
 title: Create document embedding workflow for folder processing
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-12-21 04:05'
-updated_date: '2025-12-21 04:39'
+updated_date: '2025-12-21 04:46'
 labels: []
 dependencies:
   - task-1
@@ -33,25 +33,25 @@ The workflow should be reusable, configurable, and production-ready with compreh
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Workflow is implemented as a composable pipeline using existing pipeline infrastructure
-- [ ] #2 File discovery finds all .md files in a specified directory (recursive traversal)
-- [ ] #3 Clean Markdown utility is integrated and applied to each document
-- [ ] #4 Split Markdown utility is integrated to chunk cleaned documents
-- [ ] #5 Chunks are batched in groups of 50 for efficient API calls (configurable batch size)
-- [ ] #6 End-of-text token '<|endoftext|>' is appended to each chunk before embedding
-- [ ] #7 Embedding API endpoint is configurable (default: https://llama.home.jeffutter.com/v1/embeddings)
-- [ ] #8 Embedding model is configurable (default: qwen3-embedding)
-- [ ] #9 API requests follow OpenAI embeddings format: {input: string[], model: string}
-- [ ] #10 Response vectors are extracted from API response format: {data: [{embedding: number[]}]}
-- [ ] #11 Output includes chunk content, vector embeddings, metadata, and UUIDs
-- [ ] #12 Error handling gracefully manages API failures, invalid files, and malformed responses
-- [ ] #13 Configuration includes: folder path, batch size, API endpoint, model name, chunk size parameters
-- [ ] #14 Unit tests verify each workflow step in isolation
-- [ ] #15 Integration tests verify end-to-end workflow with sample markdown files
-- [ ] #16 Integration tests verify API batching and response handling (mock API)
-- [ ] #17 Tests verify error handling for missing files, API errors, and invalid markdown
-- [ ] #18 All tests pass when running 'bun test'
-- [ ] #19 Documentation includes usage examples and configuration options
+- [x] #1 Workflow is implemented as a composable pipeline using existing pipeline infrastructure
+- [x] #2 File discovery finds all .md files in a specified directory (recursive traversal)
+- [x] #3 Clean Markdown utility is integrated and applied to each document
+- [x] #4 Split Markdown utility is integrated to chunk cleaned documents
+- [x] #5 Chunks are batched in groups of 50 for efficient API calls (configurable batch size)
+- [x] #6 End-of-text token '<|endoftext|>' is appended to each chunk before embedding
+- [x] #7 Embedding API endpoint is configurable (default: https://llama.home.jeffutter.com/v1/embeddings)
+- [x] #8 Embedding model is configurable (default: qwen3-embedding)
+- [x] #9 API requests follow OpenAI embeddings format: {input: string[], model: string}
+- [x] #10 Response vectors are extracted from API response format: {data: [{embedding: number[]}]}
+- [x] #11 Output includes chunk content, vector embeddings, metadata, and UUIDs
+- [x] #12 Error handling gracefully manages API failures, invalid files, and malformed responses
+- [x] #13 Configuration includes: folder path, batch size, API endpoint, model name, chunk size parameters
+- [x] #14 Unit tests verify each workflow step in isolation
+- [x] #15 Integration tests verify end-to-end workflow with sample markdown files
+- [x] #16 Integration tests verify API batching and response handling (mock API)
+- [x] #17 Tests verify error handling for missing files, API errors, and invalid markdown
+- [x] #18 All tests pass when running 'bun test'
+- [x] #19 Documentation includes usage examples and configuration options
 <!-- AC:END -->
 
 ## Implementation Plan
