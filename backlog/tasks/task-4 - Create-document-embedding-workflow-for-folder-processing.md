@@ -4,7 +4,7 @@ title: Create document embedding workflow for folder processing
 status: To Do
 assignee: []
 created_date: '2025-12-21 04:05'
-updated_date: '2025-12-21 04:05'
+updated_date: '2025-12-21 04:39'
 labels: []
 dependencies:
   - task-1
@@ -364,4 +364,125 @@ Once this workflow is complete, it can be:
 - Integrated into a watch mode for continuous document processing
 - Extended to store results in a vector database
 - Combined with retrieval workflows for RAG functionality
+
+## Enhanced Pipeline Architecture
+
+Based on the existing pipeline system (src/core/pipeline/builder.ts), the document embedding workflow should follow this pattern:
+
+### Workflow Structure
+
+```typescript
+import { Pipeline } from '../core/pipeline/builder';
+import { z } from 'zod';
+
+// Configuration schema
+const EmbedDocumentsConfigSchema = z.object({
+  folderPath: z.string(),
+  batchSize: z.number().default(50),
+  embeddingEndpoint: z.string().default('https://llama.home.jeffutter.com/v1/embeddings'),
+  embeddingModel: z.string().default('qwen3-embedding'),
+  minChunkSize: z.number().default(300),
+  maxChunkSize: z.number().default(1000),
+  chunkOverlap: z.number().default(100),
+});
+
+// Output schema
+const EmbeddedDocumentSchema = z.object({
+  id: z.string().uuid(),
+  content: z.string(),
+  vector: z.array(z.number()),
+  metadata: z.record(z.any()),
+  tags: z.array(z.string()),
+});
+
+const EmbedDocumentsOutputSchema = z.object({
+  documents: z.array(EmbeddedDocumentSchema),
+});
+
+type EmbedDocumentsConfig = z.infer<typeof EmbedDocumentsConfigSchema>;
+type EmbedDocumentsOutput = z.infer<typeof EmbedDocumentsOutputSchema>;
+```
+
+### Required New Steps
+
+#### 1. Discover Files Step (src/steps/io/discover-files.ts)
+```typescript
+const discoverFilesStep = createStep<
+  { path: string; pattern: string },
+  { files: Array<{ path: string; name: string }> }
+>('discoverFiles', async ({ input }) => {
+  // Use glob or recursive fs readdir to find all .md files
+  const files = await glob(input.pattern, { cwd: input.path });
+  return {
+    files: files.map(f => ({
+      path: join(input.path, f),
+      name: f
+    }))
+  };
+});
+```
+
+#### 2. Read File Step (src/steps/io/read-file.ts)
+```typescript
+const readFileStep = createStep<
+  { path: string },
+  { content: string; source: string }
+>('readFile', async ({ input }) => {
+  const file = Bun.file(input.path);
+  const content = await file.text();
+  return { content, source: input.path };
+});
+```
+
+## Additional Required Steps
+
+#### 3. Batch Items Step (src/steps/utilities/batch-items.ts)
+```typescript
+const batchItemsStep = createStep<
+  { items: Array<any>; batchSize: number },
+  { batches: Array<Array<any>> }
+>('batchItems', async ({ input }) => {
+  const batches = [];
+  for (let i = 0; i < input.items.length; i += input.batchSize) {
+    batches.push(input.items.slice(i, i + input.batchSize));
+  }
+  return { batches };
+});
+```
+
+#### 4. Add EOT Token Step (src/steps/utilities/add-eot-token.ts)
+```typescript
+const addEOTTokenStep = createStep<
+  { content: string; token?: string },
+  { content: string }
+>('addEOTToken', async ({ input }) => {
+  const token = input.token || '<|endoftext|>';
+  return { content: input.content + token };
+});
+```
+
+#### 5. Generate Embeddings Step (src/steps/ai/generate-embeddings.ts)
+```typescript
+const generateEmbeddingsStep = createStep<
+  { contents: string[]; endpoint: string; model: string },
+  { embeddings: Array<{ embedding: number[] }> }
+>('generateEmbeddings', async ({ input }) => {
+  const response = await fetch(input.endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ input: input.contents, model: input.model }),
+  });
+  if (!response.ok) throw new Error(`Embedding API error: ${response.statusText}`);
+  const data = await response.json();
+  return { embeddings: data.data };
+});
+```
+
+### Pipeline Composition
+
+Note: The pipeline system processes items sequentially. For processing multiple files, we'll need to either:
+1. Create a wrapper that loops over files and processes each through the pipeline
+2. Or create a single workflow that processes one file at a time
+
+Recommend approach: Create a workflow function that orchestrates the steps for a batch of files.
 <!-- SECTION:PLAN:END -->
