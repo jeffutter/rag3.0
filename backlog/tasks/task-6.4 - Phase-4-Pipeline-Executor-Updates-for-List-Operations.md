@@ -1,10 +1,10 @@
 ---
 id: task-6.4
 title: 'Phase 4: Pipeline Executor Updates for List Operations'
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2025-12-21 14:22'
-updated_date: '2025-12-21 14:22'
+updated_date: '2025-12-21 21:47'
 labels:
   - architecture
   - pipeline
