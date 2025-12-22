@@ -1,9 +1,10 @@
 ---
 id: task-22
 title: Add architectural documentation and guidelines for steps vs utilities
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-12-22 16:42'
+updated_date: '2025-12-22 17:22'
 labels:
   - documentation
   - architecture
@@ -83,9 +84,9 @@ Provide clear examples of:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 CLAUDE.md updated with pipeline architecture section
-- [ ] #2 Architecture documentation created in docs/
-- [ ] #3 Clear examples provided for steps, utilities, and workflows
-- [ ] #4 Guidelines explain when to use each pattern
-- [ ] #5 Anti-patterns are clearly documented
+- [x] #1 CLAUDE.md updated with pipeline architecture section
+- [x] #2 Architecture documentation created in docs/
+- [x] #3 Clear examples provided for steps, utilities, and workflows
+- [x] #4 Guidelines explain when to use each pattern
+- [x] #5 Anti-patterns are clearly documented
 <!-- AC:END -->
