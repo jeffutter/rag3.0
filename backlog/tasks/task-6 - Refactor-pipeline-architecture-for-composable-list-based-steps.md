@@ -1,7 +1,7 @@
 ---
 id: task-6
 title: Refactor pipeline architecture for composable list-based steps
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-12-21 14:11'
 updated_date: '2025-12-22 01:41'
