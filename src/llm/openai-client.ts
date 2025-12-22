@@ -78,6 +78,11 @@ export class OpenAICompatibleClient implements LLMClient {
       createParams.stop = options.stopSequences;
     }
 
+    logger.debug({
+      event: "completion_params",
+      params: createParams
+    });
+
     const response = await this.client.chat.completions.create(createParams);
 
     const choice = response.choices[0];
@@ -171,6 +176,7 @@ export class OpenAICompatibleClient implements LLMClient {
           });
           messages.push({
             role: "tool",
+            name: toolCall.name,
             content: JSON.stringify({
               error: `Unknown tool: ${toolCall.name}`,
             }),
@@ -223,6 +229,7 @@ export class OpenAICompatibleClient implements LLMClient {
           messages.push({
             role: "tool",
             content: toolResultContent,
+            name: tool.name,
             toolCallId: toolCall.id,
           });
         } catch (error) {
@@ -234,6 +241,7 @@ export class OpenAICompatibleClient implements LLMClient {
           });
           messages.push({
             role: "tool",
+            name: tool.name,
             content: JSON.stringify({
               error: error instanceof Error ? error.message : String(error),
             }),
@@ -285,6 +293,7 @@ export class OpenAICompatibleClient implements LLMClient {
         case "tool":
           return {
             role: "tool",
+            name: msg.name,
             content: msg.content,
             // biome-ignore lint/style/noNonNullAssertion: toolCallId is required for tool messages
             tool_call_id: msg.toolCallId!,
