@@ -41,6 +41,114 @@ test("hello world", () => {
 });
 ```
 
+## Pipeline Architecture
+
+### Steps vs Utility Functions vs Workflows
+
+**CRITICAL RULE: Steps must not call other steps.**
+
+This architecture enforces separation of concerns for better maintainability, testability, and composability.
+
+#### Component Types
+
+- **Steps** are pipeline building blocks that can be composed in workflows
+  - Created using `createStep()`
+  - Encapsulate a single operation with schema validation and error handling
+  - Should appear as distinct pipeline stages
+  - May call utility functions for business logic
+
+- **Utility Functions** contain reusable business logic
+  - Pure functions that perform specific operations
+  - Located in `src/lib/`
+  - Can be used by steps, workflows, or other utilities
+  - Independently testable without pipeline infrastructure
+
+- **Workflows** compose multiple steps together
+  - Located in `src/workflows/`
+  - Use the `Pipeline` builder to chain steps
+  - Define the overall data flow and orchestration
+  - Workflows can call other workflows if needed
+
+#### When to Create a Step
+
+Create a step when:
+- The operation will be used in multiple workflows
+- The operation needs pipeline integration (error handling, retries, metadata)
+- The operation should appear as a distinct, trackable pipeline stage
+
+#### When to Create a Utility Function
+
+Create a utility function when:
+- The logic needs to be shared between multiple steps
+- The logic needs to be used outside of pipelines
+- The logic is a pure transformation, calculation, or I/O operation
+- You want to test the logic independently from the pipeline
+
+#### Anti-Pattern: Steps Calling Steps
+
+DO NOT create steps that call other steps. This creates tight coupling and defeats the purpose of the pipeline architecture.
+
+```typescript
+// BAD - Step calling another step
+const badStep = createStep("bad", async ({ input }) => {
+  // This creates tight coupling and makes the step hard to test
+  const result = await otherStep.execute({ input, state: {}, context: undefined });
+  return result.data;
+});
+```
+
+Instead, extract shared logic to utility functions:
+
+```typescript
+// GOOD - Step using utility function
+const goodStep = createStep("good", async ({ input }) => {
+  // Clean separation: step handles pipeline integration,
+  // utility function contains the business logic
+  return await utilityFunction(input);
+});
+```
+
+#### Examples
+
+**Utility Function (src/lib/file-io.ts):**
+```typescript
+// Pure function for reading files
+export async function readFile(path: string): Promise<FileReadResult> {
+  const file = Bun.file(path);
+  if (!(await file.exists())) {
+    throw new Error(`File not found: ${path}`);
+  }
+  const content = await file.text();
+  return { content, source: path };
+}
+```
+
+**Step Using Utility (inline in workflow):**
+```typescript
+// Step wraps the utility function with pipeline integration
+createStep("readFile", async ({ input }) => {
+  try {
+    const result = await readFile(input.path);
+    return [{ ...result, path: input.path }];
+  } catch (error) {
+    console.warn(`Error reading file ${input.path}:`, error);
+    return [];
+  }
+})
+```
+
+**Workflow Composing Steps (src/workflows/embed-documents.ts):**
+```typescript
+const pipeline = Pipeline.start<{ path: string; pattern?: string }>()
+  .add("discover", discoverFilesStep)
+  .flatMap("readFiles", createStep(...), { parallel: true })
+  .flatMap("cleanedFiles", createStep(...), { parallel: true })
+  .flatMap("chunks", createStep(...), { parallel: true })
+  .map("chunksWithEOT", createStep(...), { parallel: false });
+```
+
+For more details, see `docs/architecture/steps-and-workflows.md`.
+
 ## Frontend
 
 Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.

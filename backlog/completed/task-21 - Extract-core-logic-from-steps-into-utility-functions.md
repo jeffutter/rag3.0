@@ -1,9 +1,10 @@
 ---
 id: task-21
 title: Extract core logic from steps into utility functions
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-12-22 16:42'
+updated_date: '2025-12-22 17:18'
 labels:
   - refactoring
   - architecture
@@ -52,9 +53,32 @@ Create a new `src/lib/` or `src/core/processing/` directory containing pure util
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 New utility module(s) created with all extracted functions
-- [ ] #2 All functions have proper TypeScript types
-- [ ] #3 All functions have unit tests with good coverage
-- [ ] #4 Functions are pure/stateless where possible
-- [ ] #5 Documentation/JSDoc for each function
+- [x] #1 New utility module(s) created with all extracted functions
+- [x] #2 All functions have proper TypeScript types
+- [x] #3 All functions have unit tests with good coverage
+- [x] #4 Functions are pure/stateless where possible
+- [x] #5 Documentation/JSDoc for each function
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+## Implementation Complete
+
+### Utility Modules Created:
+1. **src/lib/file-io.ts** - File reading utilities (readFile)
+2. **src/lib/markdown.ts** - Markdown processing (cleanMarkdown, splitMarkdown)
+3. **src/lib/text-processing.ts** - Text utilities (addEOT)
+4. **src/lib/embeddings.ts** - AI embeddings (generateEmbeddings)
+
+### Steps Refactored:
+- All base steps now thin wrappers around utilities
+- embed-documents.ts fixed to call utilities directly
+- No more step-calling-step violations
+
+### Verification:
+- All 352 tests pass
+- Only 1 .execute() call remains (pipeline.execute - correct)
+- TypeScript type checking passes
+- Biome linting passes
+<!-- SECTION:NOTES:END -->

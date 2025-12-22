@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createStep } from "../../core/pipeline/steps";
+import { readFile } from "../../lib/file-io";
 
 /**
  * Input schema for the Read File step.
@@ -39,21 +40,10 @@ export const readFileStep = createStep<ReadFileInput, ReadFileOutput>("readFile"
   // Validate input
   const validated = ReadFileInputSchema.parse(input);
 
-  // Use Bun.file() to read the file
-  const file = Bun.file(validated.path);
+  // Use the file-io utility function to read the file
+  const result = await readFile(validated.path);
 
-  // Check if file exists
-  if (!(await file.exists())) {
-    throw new Error(`File not found: ${validated.path}`);
-  }
-
-  // Read file content as text
-  const content = await file.text();
-
-  return {
-    content,
-    source: validated.path,
-  };
+  return result;
 });
 
 // Export schemas for testing and validation

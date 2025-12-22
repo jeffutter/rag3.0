@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createStep } from "../../core/pipeline/steps";
+import { generateEmbeddings } from "../../lib/embeddings";
 
 /**
  * Input schema for the Generate Embeddings step.
@@ -26,26 +27,6 @@ const GenerateEmbeddingsOutputSchema = z.object({
 
 type GenerateEmbeddingsInput = z.input<typeof GenerateEmbeddingsInputSchema>;
 type GenerateEmbeddingsOutput = z.infer<typeof GenerateEmbeddingsOutputSchema>;
-
-/**
- * API request schema for OpenAI-compatible embeddings endpoint.
- */
-const EmbeddingRequestSchema = z.object({
-  input: z.array(z.string()),
-  model: z.string(),
-});
-
-/**
- * API response schema for OpenAI-compatible embeddings endpoint.
- */
-const EmbeddingResponseSchema = z.object({
-  data: z.array(
-    z.object({
-      embedding: z.array(z.number()),
-      index: z.number().optional(),
-    }),
-  ),
-});
 
 /**
  * Generate Embeddings step for pipeline.
@@ -80,46 +61,8 @@ export const generateEmbeddingsStep = createStep<GenerateEmbeddingsInput, Genera
     // Validate input
     const validated = GenerateEmbeddingsInputSchema.parse(input);
 
-    // Prepare request body
-    const requestBody = EmbeddingRequestSchema.parse({
-      input: validated.contents,
-      model: validated.model,
-    });
-
-    // Make API request
-    const response = await fetch(validated.endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    // Check response status
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Embedding API error (${response.status}): ${errorText}`);
-    }
-
-    // Parse and validate response
-    const responseData = await response.json();
-    const validatedResponse = EmbeddingResponseSchema.parse(responseData);
-
-    // Extract embeddings (API may return in any order, so we need to sort by index if present)
-    const embeddings = validatedResponse.data
-      .sort((a, b) => {
-        const aIndex = a.index ?? 0;
-        const bIndex = b.index ?? 0;
-        return aIndex - bIndex;
-      })
-      .map((item) => ({
-        embedding: item.embedding,
-      }));
-
-    // Verify we got the expected number of embeddings
-    if (embeddings.length !== validated.contents.length) {
-      throw new Error(`Expected ${validated.contents.length} embeddings but received ${embeddings.length}`);
-    }
+    // Call the utility function to generate embeddings
+    const embeddings = await generateEmbeddings(validated.contents, validated.endpoint, validated.model);
 
     return { embeddings };
   },

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createStep } from "../../core/pipeline/steps";
+import { addEOT } from "../../lib/text-processing";
 
 /**
  * Input schema for the Add EOT step.
@@ -42,8 +43,8 @@ export const addEOTStep = createStep<AddEOTInput, AddEOTOutput>("addEOT", async 
   // Validate input
   const validated = AddEOTInputSchema.parse(input);
 
-  // Add EOT token if provided
-  const content = validated.eotToken ? validated.content + validated.eotToken : validated.content;
+  // Use the utility function to process the content
+  const content = addEOT(validated.content, validated.eotToken);
 
   return { content };
 });

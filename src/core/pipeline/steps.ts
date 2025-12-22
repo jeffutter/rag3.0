@@ -12,7 +12,31 @@ import type { Step, StepError, StepExecutionContext, StepResult } from "./types"
  * - state: Accumulated outputs from all previous steps (by name)
  * - context: Additional runtime context
  *
+ * **IMPORTANT: Steps must not call other steps.**
+ *
+ * Steps are pipeline building blocks designed to be composed in workflows.
+ * If you need to share logic between steps, extract it to a utility function
+ * in `src/lib/` instead of creating a step that calls another step.
+ *
+ * @see {@link https://github.com/jeffutter/rag3.0/blob/main/docs/architecture/steps-and-workflows.md} for architecture details
+ *
  * @example
+ * // Good: Step using a utility function
+ * const step = createStep<string, number>('myStep', async ({ input }) => {
+ *   // Call utility function for business logic
+ *   return await utilityFunction(input);
+ * });
+ *
+ * @example
+ * // Bad: Step calling another step (anti-pattern)
+ * const badStep = createStep('badStep', async ({ input }) => {
+ *   // DON'T DO THIS - creates tight coupling
+ *   const result = await otherStep.execute({ input, state: {}, context: undefined });
+ *   return result.data;
+ * });
+ *
+ * @example
+ * // Type-safe step with state accumulation
  * const step = createStep<string, number, { prevStep: string }>('myStep', async ({ input, state, context }) => {
  *   // input is a string
  *   // state.prevStep is available and typed correctly

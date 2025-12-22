@@ -1,12 +1,11 @@
 import { z } from "zod";
 import { Pipeline } from "../core/pipeline/builder";
 import { createStep } from "../core/pipeline/steps";
-import { generateEmbeddingsStep } from "../steps/ai/generate-embeddings";
+import { generateEmbeddings } from "../lib/embeddings";
+import { readFile } from "../lib/file-io";
+import { cleanMarkdown, splitMarkdown } from "../lib/markdown";
+import { addEOT } from "../lib/text-processing";
 import { discoverFilesStep } from "../steps/io/discover-files";
-import { readFileStep } from "../steps/io/read-file";
-import { addEOTStep } from "../steps/utilities/add-eot";
-import { cleanMarkdownStep } from "../steps/utilities/clean-markdown";
-import { splitMarkdownStep } from "../steps/utilities/split-markdown";
 
 /**
  * Embed Documents Workflow
@@ -81,209 +80,33 @@ interface FileEntry {
 }
 
 /**
- * Interface for chunk data with all necessary metadata.
+ * Interface for chunk data from split markdown step.
  */
 interface ChunkData {
   id: string;
   content: string;
   // biome-ignore lint/suspicious/noExplicitAny: Metadata structure is dynamic and unknown
   metadata: Record<string, any>;
-  tags: string[];
   index: number;
+  length: number;
 }
 
 /**
  * Interface for chunk with embedding attached.
  */
-interface ChunkWithEmbedding extends ChunkData {
+interface ChunkWithEmbedding {
+  id: string;
+  content: string;
+  // biome-ignore lint/suspicious/noExplicitAny: Metadata structure is dynamic and unknown
+  metadata: Record<string, any>;
   embedding: number[];
 }
 
 /**
- * Adapter step: Read and process a single file.
- * Takes a file entry and returns processed chunks with metadata.
- */
-const processFileStep = createStep<
-  FileEntry & {
-    headingsToRemove?: string[] | undefined;
-    minChunkSize: number;
-    maxChunkSize: number;
-    chunkOverlap: number;
-  },
-  ChunkData[]
->("processFile", async ({ input }) => {
-  try {
-    // Read file
-    const readResult = await readFileStep.execute({
-      input: { path: input.path },
-      state: {},
-      context: undefined,
-    });
-
-    if (!readResult.success) {
-      console.warn(`Failed to read file ${input.path}: ${readResult.error.message}`);
-      return [];
-    }
-
-    const { content, source } = readResult.data;
-
-    // Clean markdown
-    const cleanResult = await cleanMarkdownStep.execute({
-      input: {
-        content,
-        ...(input.headingsToRemove ? { headingsToRemove: input.headingsToRemove } : {}),
-      },
-      state: {},
-      context: undefined,
-    });
-
-    if (!cleanResult.success) {
-      console.warn(`Failed to clean file ${input.path}: ${cleanResult.error.message}`);
-      return [];
-    }
-
-    const { content: cleanedContent, tags } = cleanResult.data;
-
-    // Split into chunks
-    const splitResult = await splitMarkdownStep.execute({
-      input: {
-        content: cleanedContent,
-        source,
-        metadata: { source, tags },
-        minChunkSize: input.minChunkSize,
-        maxChunkSize: input.maxChunkSize,
-        chunkOverlap: input.chunkOverlap,
-      },
-      state: {},
-      context: undefined,
-    });
-
-    if (!splitResult.success) {
-      console.warn(`Failed to split file ${input.path}: ${splitResult.error.message}`);
-      return [];
-    }
-
-    // Map chunks to ChunkData format
-    return splitResult.data.chunks.map((chunk) => ({
-      id: chunk.id,
-      content: chunk.content,
-      metadata: chunk.metadata,
-      tags: chunk.metadata.tags || [],
-      index: chunk.index,
-    }));
-  } catch (error) {
-    console.warn(`Error processing file ${input.path}:`, error);
-    return [];
-  }
-});
-
-/**
- * Adapter step: Add EOT token to a chunk.
- */
-const addEOTToChunkStep = createStep<ChunkData & { eotToken?: string | undefined }, ChunkData>(
-  "addEOTToChunk",
-  async ({ input }) => {
-    if (!input.eotToken) {
-      return {
-        id: input.id,
-        content: input.content,
-        metadata: input.metadata,
-        tags: input.tags,
-        index: input.index,
-      };
-    }
-
-    const eotResult = await addEOTStep.execute({
-      input: {
-        content: input.content,
-        eotToken: input.eotToken,
-      },
-      state: {},
-      context: undefined,
-    });
-
-    if (!eotResult.success) {
-      // If EOT fails, just return the original content
-      return {
-        id: input.id,
-        content: input.content,
-        metadata: input.metadata,
-        tags: input.tags,
-        index: input.index,
-      };
-    }
-
-    return {
-      id: input.id,
-      content: eotResult.data.content,
-      metadata: input.metadata,
-      tags: input.tags,
-      index: input.index,
-    };
-  },
-);
-
-/**
- * Adapter step: Generate embeddings for a batch of chunks.
- */
-const embedBatchStep = createStep<
-  {
-    chunks: ChunkData[];
-    endpoint: string;
-    model: string;
-  },
-  ChunkWithEmbedding[]
->("embedBatch", async ({ input }) => {
-  try {
-    const contents = input.chunks.map((chunk) => chunk.content);
-
-    const embedResult = await generateEmbeddingsStep.execute({
-      input: {
-        contents,
-        endpoint: input.endpoint,
-        model: input.model,
-      },
-      state: {},
-      context: undefined,
-    });
-
-    if (!embedResult.success) {
-      console.error(`Failed to generate embeddings for batch: ${embedResult.error.message}`);
-      return [];
-    }
-
-    const { embeddings } = embedResult.data;
-
-    // Merge chunks with their embeddings
-    return input.chunks
-      .map((chunk, i) => {
-        const embedding = embeddings[i];
-        if (!embedding) {
-          console.error(`Missing embedding at index ${i}`);
-          return null;
-        }
-
-        return {
-          id: chunk.id,
-          content: chunk.content,
-          metadata: chunk.metadata,
-          tags: chunk.tags,
-          index: chunk.index,
-          embedding: embedding.embedding,
-        };
-      })
-      .filter((chunk): chunk is ChunkWithEmbedding => chunk !== null);
-  } catch (error) {
-    console.error("Error generating embeddings for batch:", error);
-    return [];
-  }
-});
-
-/**
  * Execute the document embedding workflow using a fully declarative pipeline.
  *
- * This implementation uses zero manual loops - all iteration is handled
- * declaratively through map, flatMap, batch, and flatten operations.
+ * This implementation composes base steps directly in the pipeline without
+ * creating intermediate adapter steps that call other steps.
  */
 export async function embedDocuments(config: EmbedDocumentsConfig): Promise<EmbedDocumentsOutput> {
   // Validate configuration
@@ -308,31 +131,91 @@ export async function embedDocuments(config: EmbedDocumentsConfig): Promise<Embe
       ),
     )
 
-    // Step 3: Process each file in parallel (read, clean, split)
+    // Step 3: Read each file
     .flatMap(
-      "chunks",
-      createStep<FileEntry, ChunkData[], { discover: { files: FileEntry[] }; files: FileEntry[] }>(
-        "processFileAdapter",
-        async ({ input }) => {
-          return await processFileStep
-            .execute({
-              input: {
-                ...input,
-                headingsToRemove: validated.headingsToRemove,
-                minChunkSize: validated.minChunkSize,
-                maxChunkSize: validated.maxChunkSize,
-                chunkOverlap: validated.chunkOverlap,
-              },
-              state: {},
-              context: undefined,
-            })
-            .then((r) => (r.success ? r.data : []));
-        },
-      ),
+      "readFiles",
+      createStep<
+        FileEntry,
+        { content: string; source: string; path: string }[],
+        { discover: { files: FileEntry[] }; files: FileEntry[] }
+      >("readFile", async ({ input }) => {
+        try {
+          const result = await readFile(input.path);
+          return [{ ...result, path: input.path }];
+        } catch (error) {
+          console.warn(`Error reading file ${input.path}:`, error);
+          return [];
+        }
+      }),
       { parallel: true },
     )
 
-    // Step 4: Add EOT tokens to each chunk
+    // Step 4: Clean markdown
+    .flatMap(
+      "cleanedFiles",
+      createStep<
+        { content: string; source: string; path: string },
+        { content: string; source: string; tags: string[]; path: string }[],
+        {
+          discover: { files: FileEntry[] };
+          files: FileEntry[];
+          readFiles: { content: string; source: string; path: string }[];
+        }
+      >("cleanMarkdown", async ({ input }) => {
+        try {
+          const result = await cleanMarkdown(input.content, validated.headingsToRemove);
+
+          return [
+            {
+              content: result.content,
+              source: input.source,
+              tags: result.tags,
+              path: input.path,
+            },
+          ];
+        } catch (error) {
+          console.warn(`Error cleaning file ${input.path}:`, error);
+          return [];
+        }
+      }),
+      { parallel: true },
+    )
+
+    // Step 5: Split into chunks
+    .flatMap(
+      "chunks",
+      createStep<
+        { content: string; source: string; tags: string[]; path: string },
+        ChunkData[],
+        {
+          discover: { files: FileEntry[] };
+          files: FileEntry[];
+          readFiles: { content: string; source: string; path: string }[];
+          cleanedFiles: { content: string; source: string; tags: string[]; path: string }[];
+        }
+      >("splitMarkdown", async ({ input }) => {
+        try {
+          const chunks = await splitMarkdown(
+            input.content,
+            input.source,
+            { source: input.source, tags: input.tags },
+            {
+              minChunkSize: validated.minChunkSize,
+              maxChunkSize: validated.maxChunkSize,
+              chunkOverlap: validated.chunkOverlap,
+            },
+          );
+
+          return chunks;
+        } catch (error) {
+          console.warn(`Error splitting file ${input.path}:`, error);
+          return [];
+        }
+      }),
+      { parallel: true },
+    )
+
+    // Step 6: Add EOT tokens to each chunk
     .map(
       "chunksWithEOT",
       createStep<
@@ -341,27 +224,35 @@ export async function embedDocuments(config: EmbedDocumentsConfig): Promise<Embe
         {
           discover: { files: FileEntry[] };
           files: FileEntry[];
+          readFiles: { content: string; source: string; path: string }[];
+          cleanedFiles: { content: string; source: string; tags: string[]; path: string }[];
           chunks: ChunkData[];
         }
-      >("addEOTAdapter", async ({ input }) => {
-        return await addEOTToChunkStep
-          .execute({
-            input: {
-              ...input,
-              eotToken: validated.eotToken,
-            },
-            state: {},
-            context: undefined,
-          })
-          .then((r) => (r.success ? r.data : input));
+      >("addEOT", async ({ input }) => {
+        // If no EOT token configured, return chunk as-is
+        if (!validated.eotToken) {
+          return input;
+        }
+
+        try {
+          const content = addEOT(input.content, validated.eotToken);
+
+          return {
+            ...input,
+            content,
+          };
+        } catch (error) {
+          console.warn(`Error adding EOT to chunk ${input.id}:`, error);
+          return input;
+        }
       }),
       { parallel: false },
     )
 
-    // Step 5: Batch chunks for API calls
+    // Step 7: Batch chunks for API calls
     .batch("batches", validated.batchSize)
 
-    // Step 6: Generate embeddings for each batch
+    // Step 8: Generate embeddings for each batch
     .map(
       "embeddedBatches",
       createStep<
@@ -370,30 +261,47 @@ export async function embedDocuments(config: EmbedDocumentsConfig): Promise<Embe
         {
           discover: { files: FileEntry[] };
           files: FileEntry[];
+          readFiles: { content: string; source: string; path: string }[];
+          cleanedFiles: { content: string; source: string; tags: string[]; path: string }[];
           chunks: ChunkData[];
           chunksWithEOT: ChunkData[];
           batches: ChunkData[][];
         }
-      >("embedBatchAdapter", async ({ input }) => {
-        return await embedBatchStep
-          .execute({
-            input: {
-              chunks: input,
-              endpoint: validated.embeddingEndpoint,
-              model: validated.embeddingModel,
-            },
-            state: {},
-            context: undefined,
-          })
-          .then((r) => (r.success ? r.data : []));
+      >("generateEmbeddings", async ({ input }) => {
+        try {
+          const contents = input.map((chunk) => chunk.content);
+
+          const embeddings = await generateEmbeddings(contents, validated.embeddingEndpoint, validated.embeddingModel);
+
+          // Merge chunks with their embeddings
+          return input
+            .map((chunk, i) => {
+              const embedding = embeddings[i];
+              if (!embedding) {
+                console.error(`Missing embedding at index ${i}`);
+                return null;
+              }
+
+              return {
+                id: chunk.id,
+                content: chunk.content,
+                metadata: chunk.metadata,
+                embedding: embedding.embedding,
+              };
+            })
+            .filter((chunk): chunk is ChunkWithEmbedding => chunk !== null);
+        } catch (error) {
+          console.error("Error generating embeddings for batch:", error);
+          return [];
+        }
       }),
       { parallel: false },
     )
 
-    // Step 7: Flatten batches back to a single array
+    // Step 9: Flatten batches back to a single array
     .flatten("embedded")
 
-    // Step 8: Format the final output
+    // Step 10: Format the final output
     .add(
       "output",
       createStep<
@@ -406,6 +314,8 @@ export async function embedDocuments(config: EmbedDocumentsConfig): Promise<Embe
         {
           discover: { files: FileEntry[] };
           files: FileEntry[];
+          readFiles: { content: string; source: string; path: string }[];
+          cleanedFiles: { content: string; source: string; tags: string[]; path: string }[];
           chunks: ChunkData[];
           chunksWithEOT: ChunkData[];
           batches: ChunkData[][];
@@ -422,7 +332,7 @@ export async function embedDocuments(config: EmbedDocumentsConfig): Promise<Embe
           content: chunk.content,
           vector: chunk.embedding,
           metadata: chunk.metadata,
-          tags: chunk.tags,
+          tags: (chunk.metadata.tags as string[]) || [],
         }));
 
         // Get total chunks from the chunks step (before EOT)

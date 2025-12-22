@@ -1,13 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import {
-  getChunkUUID,
-  isValidChunk,
-  SplitMarkdownInputSchema,
-  SplitMarkdownOutputSchema,
-  smartSplitMarkdown,
-  splitMarkdownStep,
-  stringToBaseUUID,
-} from "./split-markdown";
+import { getChunkUUID, isValidChunk, smartSplitMarkdown, stringToBaseUUID } from "../../lib/markdown";
+import { SplitMarkdownInputSchema, SplitMarkdownOutputSchema, splitMarkdownStep } from "./split-markdown";
 
 describe("isValidChunk", () => {
   test("rejects empty string", () => {
@@ -232,7 +225,7 @@ Paragraph under heading 3.
 
     expect(chunks.length).toBeGreaterThan(0);
     // Verify chunks contain markdown structure
-    expect(chunks.some((c) => c.pageContent.includes("#"))).toBe(true);
+    expect(chunks.some((c: { pageContent: string }) => c.pageContent.includes("#"))).toBe(true);
   });
 
   test("handles code blocks", async () => {
