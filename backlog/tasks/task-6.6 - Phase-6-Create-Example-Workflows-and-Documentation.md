@@ -1,10 +1,10 @@
 ---
 id: task-6.6
 title: 'Phase 6: Create Example Workflows and Documentation'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2025-12-21 14:22'
-updated_date: '2025-12-22 01:09'
+updated_date: '2025-12-22 01:18'
 labels:
   - documentation
   - examples
@@ -50,13 +50,13 @@ This is Phase 6 of the pipeline architecture refactoring (parent: task-6).
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 At least 3 example workflows in src/core/pipeline/examples/
-- [ ] #2 Example 1: Data transformation with map/filter
-- [ ] #3 Example 2: Parallel web scraping workflow
-- [ ] #4 Example 3: Batch processing with batch/flatten
-- [ ] #5 rag-query workflow reviewed and updated if beneficial
-- [ ] #6 README updated with new pipeline patterns and examples
-- [ ] #7 API documentation for all new methods (JSDoc)
-- [ ] #8 Migration guide created for refactoring existing workflows
-- [ ] #9 ADR document explaining architectural decisions
+- [x] #1 At least 3 example workflows in src/core/pipeline/examples/
+- [x] #2 Example 1: Data transformation with map/filter
+- [x] #3 Example 2: Parallel web scraping workflow
+- [x] #4 Example 3: Batch processing with batch/flatten
+- [x] #5 rag-query workflow reviewed and updated if beneficial
+- [x] #6 README updated with new pipeline patterns and examples
+- [x] #7 API documentation for all new methods (JSDoc)
+- [x] #8 Migration guide created for refactoring existing workflows
+- [x] #9 ADR document explaining architectural decisions
 <!-- AC:END -->
