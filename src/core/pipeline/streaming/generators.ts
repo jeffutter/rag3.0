@@ -207,8 +207,8 @@ export async function* skip<T>(stream: AsyncGenerator<T>, n: number): AsyncGener
  * Only yields items where the predicate returns true.
  *
  * @template T - The type of items in the stream
- * @param stream - Source async generator
- * @param predicate - Function that returns true for items to keep
+ * @param source - Source async iterable
+ * @param predicate - Function that returns true for items to keep (receives item and index)
  * @returns Async generator yielding only filtered items
  *
  * @example
@@ -221,26 +221,31 @@ export async function* skip<T>(stream: AsyncGenerator<T>, n: number): AsyncGener
  *
  * @example
  * ```typescript
- * // Async predicate
- * const validated = filter(items, async item => {
+ * // Async predicate with index
+ * const validated = filter(items, async (item, index) => {
+ *   console.log(`Validating item ${index}`);
  *   return await validateItem(item);
  * });
  * ```
  */
 export async function* filter<T>(
-  stream: AsyncGenerator<T>,
-  predicate: (item: T) => boolean | Promise<boolean>,
+  source: AsyncIterable<T>,
+  predicate: (item: T, index: number) => boolean | Promise<boolean>,
 ): AsyncGenerator<T> {
+  let index = 0;
   try {
-    for await (const item of stream) {
-      const shouldKeep = await predicate(item);
+    for await (const item of source) {
+      const shouldKeep = await predicate(item, index);
+      index++;
       if (shouldKeep) {
         yield item;
       }
     }
   } finally {
     // Cleanup: ensure the source stream is properly closed
-    await stream.return?.(undefined);
+    if (typeof (source as AsyncGenerator<T>).return === "function") {
+      await (source as AsyncGenerator<T>).return?.(undefined);
+    }
   }
 }
 
@@ -250,8 +255,8 @@ export async function* filter<T>(
  *
  * @template TIn - The type of input items
  * @template TOut - The type of output items
- * @param stream - Source async generator
- * @param fn - Function to transform each item
+ * @param source - Source async iterable
+ * @param fn - Function to transform each item (receives item and index)
  * @returns Async generator yielding transformed items
  *
  * @example
@@ -264,24 +269,28 @@ export async function* filter<T>(
  *
  * @example
  * ```typescript
- * // Async transformation
- * const enriched = map(items, async item => {
+ * // Async transformation with index
+ * const enriched = map(items, async (item, index) => {
  *   const details = await fetchDetails(item.id);
- *   return { ...item, details };
+ *   return { ...item, details, position: index };
  * });
  * ```
  */
 export async function* map<TIn, TOut>(
-  stream: AsyncGenerator<TIn>,
-  fn: (item: TIn) => TOut | Promise<TOut>,
+  source: AsyncIterable<TIn>,
+  fn: (item: TIn, index: number) => TOut | Promise<TOut>,
 ): AsyncGenerator<TOut> {
+  let index = 0;
   try {
-    for await (const item of stream) {
-      yield await fn(item);
+    for await (const item of source) {
+      yield await fn(item, index);
+      index++;
     }
   } finally {
     // Cleanup: ensure the source stream is properly closed
-    await stream.return?.(undefined);
+    if (typeof (source as AsyncGenerator<TIn>).return === "function") {
+      await (source as AsyncGenerator<TIn>).return?.(undefined);
+    }
   }
 }
 
@@ -291,8 +300,8 @@ export async function* map<TIn, TOut>(
  *
  * @template TIn - The type of input items
  * @template TOut - The type of output items
- * @param stream - Source async generator
- * @param fn - Function that returns an array or iterable of outputs for each input
+ * @param source - Source async iterable
+ * @param fn - Function that returns an array or iterable of outputs for each input (receives item and index)
  * @returns Async generator yielding all outputs from all transformations
  *
  * @example
@@ -305,20 +314,22 @@ export async function* map<TIn, TOut>(
  *
  * @example
  * ```typescript
- * // Async expansion
- * const chunks = flatMap(files, async file => {
+ * // Async expansion with index
+ * const chunks = flatMap(files, async (file, index) => {
  *   const content = await readFile(file);
- *   return splitIntoChunks(content);
+ *   return splitIntoChunks(content).map(chunk => ({ ...chunk, fileIndex: index }));
  * });
  * ```
  */
 export async function* flatMap<TIn, TOut>(
-  stream: AsyncGenerator<TIn>,
-  fn: (item: TIn) => TOut[] | Promise<TOut[]> | AsyncIterable<TOut>,
+  source: AsyncIterable<TIn>,
+  fn: (item: TIn, index: number) => AsyncIterable<TOut> | Iterable<TOut> | Promise<Iterable<TOut>>,
 ): AsyncGenerator<TOut> {
+  let index = 0;
   try {
-    for await (const item of stream) {
-      const outputs = await fn(item);
+    for await (const item of source) {
+      const outputs = await fn(item, index);
+      index++;
 
       // Handle both arrays and async iterables
       if (Symbol.asyncIterator in outputs) {
@@ -338,7 +349,9 @@ export async function* flatMap<TIn, TOut>(
     }
   } finally {
     // Cleanup: ensure the source stream is properly closed
-    await stream.return?.(undefined);
+    if (typeof (source as AsyncGenerator<TIn>).return === "function") {
+      await (source as AsyncGenerator<TIn>).return?.(undefined);
+    }
   }
 }
 
@@ -420,8 +433,8 @@ export async function* flatten<T>(stream: AsyncGenerator<T[]>): AsyncGenerator<T
  * Useful for logging, metrics collection, or debugging.
  *
  * @template T - The type of items in the stream
- * @param stream - Source async generator
- * @param fn - Function to call for each item (return value is ignored)
+ * @param source - Source async iterable
+ * @param fn - Function to call for each item (receives item and index, return value is ignored)
  * @returns Async generator yielding the same items unchanged
  *
  * @example
@@ -431,15 +444,30 @@ export async function* flatten<T>(stream: AsyncGenerator<T[]>): AsyncGenerator<T
  * await toArray(logged);
  * // Logs: Processing: 1, Processing: 2, Processing: 3
  * ```
+ *
+ * @example
+ * ```typescript
+ * // Track progress with index
+ * const progress = tap(items, (item, index) => {
+ *   console.log(`Processing item ${index + 1}`);
+ * });
+ * ```
  */
-export async function* tap<T>(stream: AsyncGenerator<T>, fn: (item: T) => void | Promise<void>): AsyncGenerator<T> {
+export async function* tap<T>(
+  source: AsyncIterable<T>,
+  fn: (item: T, index: number) => void | Promise<void>,
+): AsyncGenerator<T> {
+  let index = 0;
   try {
-    for await (const item of stream) {
-      await fn(item);
+    for await (const item of source) {
+      await fn(item, index);
+      index++;
       yield item;
     }
   } finally {
     // Cleanup: ensure the source stream is properly closed
-    await stream.return?.(undefined);
+    if (typeof (source as AsyncGenerator<T>).return === "function") {
+      await (source as AsyncGenerator<T>).return?.(undefined);
+    }
   }
 }

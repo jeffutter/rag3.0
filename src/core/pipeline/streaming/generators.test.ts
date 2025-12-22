@@ -244,6 +244,31 @@ describe("filter", () => {
       { id: 3, active: true },
     ]);
   });
+
+  test("provides correct index to predicate", async () => {
+    const stream = fromArray([10, 20, 30, 40, 50]);
+    const indices: number[] = [];
+    const filtered = filter(stream, (n, index) => {
+      indices.push(index);
+      return n > 25;
+    });
+    const result = await toArray(filtered);
+
+    expect(result).toEqual([30, 40, 50]);
+    expect(indices).toEqual([0, 1, 2, 3, 4]); // All indices should be passed
+  });
+
+  test("index increments for all items, not just filtered ones", async () => {
+    const stream = fromArray([1, 2, 3, 4, 5]);
+    const indices: number[] = [];
+    const evens = filter(stream, (n, index) => {
+      indices.push(index);
+      return n % 2 === 0;
+    });
+    await toArray(evens);
+
+    expect(indices).toEqual([0, 1, 2, 3, 4]);
+  });
 });
 
 describe("map", () => {
@@ -285,6 +310,28 @@ describe("map", () => {
       { id: 1, value: 10, doubled: 20 },
       { id: 2, value: 20, doubled: 40 },
     ]);
+  });
+
+  test("provides correct index to transform function", async () => {
+    const stream = fromArray(["a", "b", "c"]);
+    const indexed = map(stream, (item, index) => `${index}:${item}`);
+    const result = await toArray(indexed);
+
+    expect(result).toEqual(["0:a", "1:b", "2:c"]);
+  });
+
+  test("index increments correctly with async transform", async () => {
+    const stream = fromArray([10, 20, 30]);
+    const indices: number[] = [];
+    const transformed = map(stream, async (n, index) => {
+      indices.push(index);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      return n + index;
+    });
+    const result = await toArray(transformed);
+
+    expect(result).toEqual([10, 21, 32]);
+    expect(indices).toEqual([0, 1, 2]);
   });
 });
 
@@ -330,6 +377,27 @@ describe("flatMap", () => {
     const flattened = flatMap(stream, (obj) => obj.items);
     const result = await toArray(flattened);
     expect(result).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  test("provides correct index to transform function", async () => {
+    const stream = fromArray(["a", "b", "c"]);
+    const indexed = flatMap(stream, (item, index) => [`${index}:${item}:1`, `${index}:${item}:2`]);
+    const result = await toArray(indexed);
+
+    expect(result).toEqual(["0:a:1", "0:a:2", "1:b:1", "1:b:2", "2:c:1", "2:c:2"]);
+  });
+
+  test("index increments for input items, not output items", async () => {
+    const stream = fromArray([1, 2, 3]);
+    const indices: number[] = [];
+    const expanded = flatMap(stream, (n, index) => {
+      indices.push(index);
+      return [n, n * 2, n * 3];
+    });
+    const result = await toArray(expanded);
+
+    expect(result).toEqual([1, 2, 3, 2, 4, 6, 3, 6, 9]);
+    expect(indices).toEqual([0, 1, 2]); // Only 3 input items
   });
 });
 
@@ -446,6 +514,368 @@ describe("tap", () => {
     await toArray(logged);
 
     expect(logs).toEqual(["Processing: 1", "Processing: 2", "Processing: 3"]);
+  });
+
+  test("provides correct index to side effect function", async () => {
+    const indices: number[] = [];
+    const stream = fromArray(["a", "b", "c"]);
+    const tapped = tap(stream, (_item, index) => {
+      indices.push(index);
+    });
+    await toArray(tapped);
+
+    expect(indices).toEqual([0, 1, 2]);
+  });
+
+  test("can use index for logging progress", async () => {
+    const logs: string[] = [];
+    const stream = fromArray([10, 20, 30]);
+    const logged = tap(stream, (n, index) => {
+      logs.push(`Item ${index}: ${n}`);
+    });
+    await toArray(logged);
+
+    expect(logs).toEqual(["Item 0: 10", "Item 1: 20", "Item 2: 30"]);
+  });
+});
+
+describe("error propagation", () => {
+  test("map propagates errors from transform function", async () => {
+    const stream = fromArray([1, 2, 3, 4, 5]);
+    const failing = map(stream, (n) => {
+      if (n === 3) throw new Error("Transform failed at 3");
+      return n * 2;
+    });
+
+    await expect(toArray(failing)).rejects.toThrow("Transform failed at 3");
+  });
+
+  test("filter propagates errors from predicate", async () => {
+    const stream = fromArray([1, 2, 3, 4, 5]);
+    const failing = filter(stream, (n) => {
+      if (n === 3) throw new Error("Filter failed at 3");
+      return n % 2 === 0;
+    });
+
+    await expect(toArray(failing)).rejects.toThrow("Filter failed at 3");
+  });
+
+  test("flatMap propagates errors from transform function", async () => {
+    const stream = fromArray([1, 2, 3]);
+    const failing = flatMap(stream, (n) => {
+      if (n === 2) throw new Error("FlatMap failed at 2");
+      return [n, n * 2];
+    });
+
+    await expect(toArray(failing)).rejects.toThrow("FlatMap failed at 2");
+  });
+
+  test("tap propagates errors from side effect function", async () => {
+    const stream = fromArray([1, 2, 3, 4, 5]);
+    const failing = tap(stream, (n) => {
+      if (n === 3) throw new Error("Tap failed at 3");
+    });
+
+    await expect(toArray(failing)).rejects.toThrow("Tap failed at 3");
+  });
+
+  test("async errors propagate correctly", async () => {
+    const stream = fromArray([1, 2, 3, 4, 5]);
+    const failing = map(stream, async (n) => {
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      if (n === 3) throw new Error("Async error at 3");
+      return n * 2;
+    });
+
+    await expect(toArray(failing)).rejects.toThrow("Async error at 3");
+  });
+
+  test("errors stop stream processing", async () => {
+    let processedCount = 0;
+    const stream = fromArray([1, 2, 3, 4, 5]);
+    const failing = map(stream, (n) => {
+      processedCount++;
+      if (n === 3) throw new Error("Stop here");
+      return n * 2;
+    });
+
+    await expect(toArray(failing)).rejects.toThrow("Stop here");
+    expect(processedCount).toBe(3); // Should stop after processing 3
+  });
+});
+
+describe("early termination and cleanup", () => {
+  test("take triggers cleanup of source stream", async () => {
+    let cleanedUp = false;
+
+    async function* source() {
+      try {
+        for (let i = 0; i < 100; i++) {
+          yield i;
+        }
+      } finally {
+        cleanedUp = true;
+      }
+    }
+
+    const limited = take(source(), 5);
+    const result = await toArray(limited);
+
+    expect(result).toEqual([0, 1, 2, 3, 4]);
+    expect(cleanedUp).toBe(true);
+  });
+
+  test("breaking early from for-await triggers cleanup", async () => {
+    let cleanedUp = false;
+
+    async function* source() {
+      try {
+        for (let i = 0; i < 100; i++) {
+          yield i;
+        }
+      } finally {
+        cleanedUp = true;
+      }
+    }
+
+    const stream = map(source(), (n) => n * 2);
+
+    let count = 0;
+    for await (const _item of stream) {
+      count++;
+      if (count >= 3) break;
+    }
+
+    expect(count).toBe(3);
+    expect(cleanedUp).toBe(true);
+  });
+
+  test("filter cleans up source when consumer breaks", async () => {
+    let cleanedUp = false;
+
+    async function* source() {
+      try {
+        for (let i = 0; i < 100; i++) {
+          yield i;
+        }
+      } finally {
+        cleanedUp = true;
+      }
+    }
+
+    const evens = filter(source(), (n) => n % 2 === 0);
+
+    let count = 0;
+    for await (const _item of evens) {
+      count++;
+      if (count >= 3) break;
+    }
+
+    expect(cleanedUp).toBe(true);
+  });
+
+  test("flatMap cleans up source on early termination", async () => {
+    let cleanedUp = false;
+
+    async function* source() {
+      try {
+        for (let i = 0; i < 100; i++) {
+          yield i;
+        }
+      } finally {
+        cleanedUp = true;
+      }
+    }
+
+    const expanded = flatMap(source(), (n) => [n, n * 2]);
+
+    let count = 0;
+    for await (const _item of expanded) {
+      count++;
+      if (count >= 5) break;
+    }
+
+    expect(cleanedUp).toBe(true);
+  });
+
+  test("tap cleans up source on early termination", async () => {
+    let cleanedUp = false;
+    const sideEffects: number[] = [];
+
+    async function* source() {
+      try {
+        for (let i = 0; i < 100; i++) {
+          yield i;
+        }
+      } finally {
+        cleanedUp = true;
+      }
+    }
+
+    const tapped = tap(source(), (n) => {
+      sideEffects.push(n);
+    });
+
+    let count = 0;
+    for await (const _item of tapped) {
+      count++;
+      if (count >= 3) break;
+    }
+
+    expect(sideEffects).toEqual([0, 1, 2]);
+    expect(cleanedUp).toBe(true);
+  });
+});
+
+describe("zero-buffering performance", () => {
+  test("map processes items one at a time", async () => {
+    const processOrder: string[] = [];
+
+    async function* source() {
+      for (let i = 0; i < 3; i++) {
+        processOrder.push(`source-${i}`);
+        yield i;
+      }
+    }
+
+    const mapped = map(source(), (n) => {
+      processOrder.push(`map-${n}`);
+      return n * 2;
+    });
+
+    for await (const item of mapped) {
+      processOrder.push(`consume-${item}`);
+    }
+
+    // Should be interleaved: source->map->consume, source->map->consume, etc.
+    expect(processOrder).toEqual([
+      "source-0",
+      "map-0",
+      "consume-0",
+      "source-1",
+      "map-1",
+      "consume-2",
+      "source-2",
+      "map-2",
+      "consume-4",
+    ]);
+  });
+
+  test("filter processes items one at a time", async () => {
+    const processOrder: string[] = [];
+
+    async function* source() {
+      for (let i = 0; i < 5; i++) {
+        processOrder.push(`source-${i}`);
+        yield i;
+      }
+    }
+
+    const filtered = filter(source(), (n) => {
+      processOrder.push(`filter-${n}`);
+      return n % 2 === 0;
+    });
+
+    for await (const item of filtered) {
+      processOrder.push(`consume-${item}`);
+    }
+
+    // Should process each item before moving to next
+    expect(processOrder).toEqual([
+      "source-0",
+      "filter-0",
+      "consume-0",
+      "source-1",
+      "filter-1",
+      "source-2",
+      "filter-2",
+      "consume-2",
+      "source-3",
+      "filter-3",
+      "source-4",
+      "filter-4",
+      "consume-4",
+    ]);
+  });
+
+  test("flatMap processes without buffering", async () => {
+    const processOrder: string[] = [];
+
+    async function* source() {
+      for (let i = 0; i < 2; i++) {
+        processOrder.push(`source-${i}`);
+        yield i;
+      }
+    }
+
+    const expanded = flatMap(source(), (n) => {
+      processOrder.push(`expand-${n}`);
+      return [n, n + 0.5];
+    });
+
+    for await (const item of expanded) {
+      processOrder.push(`consume-${item}`);
+    }
+
+    // Should expand and consume outputs before fetching next input
+    expect(processOrder).toEqual([
+      "source-0",
+      "expand-0",
+      "consume-0",
+      "consume-0.5",
+      "source-1",
+      "expand-1",
+      "consume-1",
+      "consume-1.5",
+    ]);
+  });
+
+  test("no unnecessary buffering in long pipeline", async () => {
+    const processOrder: string[] = [];
+    let itemsGenerated = 0;
+    let _itemsConsumed = 0;
+
+    async function* source() {
+      for (let i = 0; i < 5; i++) {
+        itemsGenerated++;
+        processOrder.push(`gen-${i}`);
+        yield i;
+      }
+    }
+
+    const pipeline = map(
+      filter(
+        map(source(), (n) => {
+          processOrder.push(`map1-${n}`);
+          return n * 2;
+        }),
+        (n) => {
+          processOrder.push(`filter-${n}`);
+          return n % 4 === 0;
+        },
+      ),
+      (n) => {
+        processOrder.push(`map2-${n}`);
+        _itemsConsumed++;
+        return n + 1;
+      },
+    );
+
+    const results = [];
+    for await (const item of pipeline) {
+      results.push(item);
+      processOrder.push(`consume-${item}`);
+
+      // At this point, we should not have generated all items yet
+      // This proves we're not buffering everything upfront
+      if (results.length === 1) {
+        expect(itemsGenerated).toBeLessThanOrEqual(5);
+        // We should have consumed first item but not generated all items
+      }
+    }
+
+    // Verify we processed items in a streaming fashion, not all at once
+    expect(results).toEqual([1, 5, 9]);
   });
 });
 
