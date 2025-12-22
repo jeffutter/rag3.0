@@ -38,7 +38,8 @@
       "Bash(timeout 180 bun test:*)",
       "Bash(biome:*)",
       "Bash(wc:*)",
-      "Bash(jj commit:*)"
+      "Bash(jj commit:*)",
+      "Bash(test:*)"
     ],
     "deny": [],
     "ask": []
