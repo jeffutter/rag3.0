@@ -12,10 +12,11 @@ export interface RAGSearchContext {
   defaultCollection: string;
 }
 
+const LIMIT = 20;
+
 const searchArgsSchema = z.object({
   query: z.string().describe("The search query to find relevant documents"),
-  collection: z.string().optional().describe("Collection to search (optional, uses default if not specified)"),
-  limit: z.number().optional().default(5).describe("Maximum number of results to return"),
+  limit: z.number().min(1).max(20).optional().default(5).describe(`Maximum number of results to return. Must be ${LIMIT} or less`),
   tags: z.array(z.string()).optional().describe("Filter results by tags"),
 });
 
@@ -31,7 +32,7 @@ export function createRAGSearchTool(context: RAGSearchContext) {
       logger.info({
         event: "rag_search_start",
         query: args.query,
-        collection: args.collection || context.defaultCollection,
+        collection: context.defaultCollection,
         limit: args.limit,
         tags: args.tags,
       });
@@ -114,18 +115,16 @@ export function createRAGSearchTool(context: RAGSearchContext) {
           }
         : undefined;
 
-      const searchCollection = args.collection || context.defaultCollection;
-
       logger.debug({
         event: "vector_search_params",
-        collection: searchCollection,
+        collection: context.defaultCollection,
         embeddingDimension: embedding.length,
         limit: args.limit,
         hasFilters: !!filters,
         filters: filters,
       });
 
-      const results = await context.vectorClient.searchWithMetadataFilter(embedding, searchCollection, filters || {}, {
+      const results = await context.vectorClient.searchWithMetadataFilter(embedding, context.defaultCollection, filters || {}, {
         limit: args.limit,
       });
 

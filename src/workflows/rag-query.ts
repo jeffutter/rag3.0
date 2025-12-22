@@ -32,7 +32,6 @@ export interface RAGQueryPipelineContext {
 // Input/Output schemas
 const ragQueryInputSchema = z.object({
   query: z.string().describe("The user query to answer"),
-  collection: z.string().optional().describe("Optional collection name override"),
   systemPrompt: z.string().optional().describe("Optional system prompt override"),
 });
 
@@ -75,7 +74,7 @@ export function createRAGQueryPipeline(contextBuilder: () => RAGQueryPipelineCon
     const ragTool = createRAGSearchTool({
       vectorClient: context.vectorClient,
       embeddingConfig: context.embeddingConfig,
-      defaultCollection: input.collection || context.defaultCollection,
+      defaultCollection: context.defaultCollection,
     });
 
     const systemPrompt =
@@ -141,7 +140,6 @@ export function createRAGQueryRegistration(
       {
         input: {
           query: "Search my notes for information about TypeScript",
-          collection: "dev-notes",
         },
         description: "Search a specific collection",
       },
