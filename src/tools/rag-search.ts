@@ -16,7 +16,13 @@ const LIMIT = 20;
 
 const searchArgsSchema = z.object({
   query: z.string().describe("The search query to find relevant documents"),
-  limit: z.number().min(1).max(20).optional().default(5).describe(`Maximum number of results to return. Must be ${LIMIT} or less`),
+  limit: z
+    .number()
+    .min(1)
+    .max(20)
+    .optional()
+    .default(5)
+    .describe(`Maximum number of results to return. Must be ${LIMIT} or less`),
   tags: z.array(z.string()).optional().describe("Filter results by tags"),
 });
 
@@ -124,9 +130,14 @@ export function createRAGSearchTool(context: RAGSearchContext) {
         filters: filters,
       });
 
-      const results = await context.vectorClient.searchWithMetadataFilter(embedding, context.defaultCollection, filters || {}, {
-        limit: args.limit,
-      });
+      const results = await context.vectorClient.searchWithMetadataFilter(
+        embedding,
+        context.defaultCollection,
+        filters || {},
+        {
+          limit: args.limit,
+        },
+      );
 
       logger.info({
         event: "rag_search_complete",

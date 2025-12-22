@@ -80,7 +80,7 @@ export class OpenAICompatibleClient implements LLMClient {
 
     logger.debug({
       event: "completion_params",
-      params: createParams
+      params: createParams,
     });
 
     const response = await this.client.chat.completions.create(createParams);
