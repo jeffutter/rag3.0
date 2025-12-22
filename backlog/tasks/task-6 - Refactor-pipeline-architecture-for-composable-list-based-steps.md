@@ -4,7 +4,7 @@ title: Refactor pipeline architecture for composable list-based steps
 status: To Do
 assignee: []
 created_date: '2025-12-21 14:11'
-updated_date: '2025-12-21 14:12'
+updated_date: '2025-12-22 01:41'
 labels:
   - architecture
   - refactoring
@@ -112,16 +112,16 @@ The pipeline executor should:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 New type definitions for ListStep and list operations with full type safety
-- [ ] #2 Pipeline builder extended with map, flatMap, batch, flatten, filter methods
-- [ ] #3 All new methods maintain compile-time type checking guarantees
-- [ ] #4 embed-documents workflow refactored to use declarative pipeline (zero manual loops)
-- [ ] #5 All existing unit tests pass without modification
-- [ ] #6 New test suite for list operations covering map, flatMap, batch, flatten
-- [ ] #7 Type safety tests that verify compile errors for invalid compositions
-- [ ] #8 Performance benchmarks show no regression (ideally improvement)
-- [ ] #9 Documentation updated with new patterns and migration guide
-- [ ] #10 At least 3 example workflows demonstrating the new architecture
+- [x] #1 New type definitions for ListStep and list operations with full type safety
+- [x] #2 Pipeline builder extended with map, flatMap, batch, flatten, filter methods
+- [x] #3 All new methods maintain compile-time type checking guarantees
+- [x] #4 embed-documents workflow refactored to use declarative pipeline (zero manual loops)
+- [x] #5 All existing unit tests pass without modification
+- [x] #6 New test suite for list operations covering map, flatMap, batch, flatten
+- [x] #7 Type safety tests that verify compile errors for invalid compositions
+- [x] #8 Performance benchmarks show no regression (ideally improvement)
+- [x] #9 Documentation updated with new patterns and migration guide
+- [x] #10 At least 3 example workflows demonstrating the new architecture
 <!-- AC:END -->
 
 ## Implementation Plan
