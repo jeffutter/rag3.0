@@ -9,6 +9,16 @@ Default to using Bun instead of Node.js.
 - Use `bunx <package> <command>` instead of `npx <package> <command>`
 - Bun automatically loads .env, so don't use dotenv.
 
+## Tooling
+
+### Biome
+
+Use `biome` directly, NOT `bunx biome`. Biome is installed through the nix flake, and running it via `bunx` attempts to download a dynamically linked binary that isn't compatible with NixOS.
+
+- Use `biome check` instead of `bunx biome check`
+- Use `biome format` instead of `bunx biome format`
+- Use `biome lint` instead of `bunx biome lint`
+
 ## APIs
 
 - `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
