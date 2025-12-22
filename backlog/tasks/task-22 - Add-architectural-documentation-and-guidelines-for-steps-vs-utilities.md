@@ -4,7 +4,7 @@ title: Add architectural documentation and guidelines for steps vs utilities
 status: Done
 assignee: []
 created_date: '2025-12-22 16:42'
-updated_date: '2025-12-22 17:22'
+updated_date: '2025-12-22 17:23'
 labels:
   - documentation
   - architecture
@@ -90,3 +90,38 @@ Provide clear examples of:
 - [x] #4 Guidelines explain when to use each pattern
 - [x] #5 Anti-patterns are clearly documented
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+## Documentation Complete
+
+### Files Created/Updated:
+1. **CLAUDE.md** - Added Pipeline Architecture section with:
+   - Clear rule: Steps must not call other steps
+   - Component types (steps, utilities, workflows)
+   - When to use each pattern
+   - Anti-pattern and good pattern examples
+   - Practical examples from codebase
+
+2. **docs/architecture/steps-and-workflows.md** - Comprehensive guide with:
+   - Three-layer architecture overview
+   - The Golden Rule explanation
+   - Why this architecture (benefits)
+   - Decision framework
+   - Extensive examples
+   - Testing strategies
+   - Migration guide
+
+3. **src/core/pipeline/steps.ts** - Enhanced JSDoc with:
+   - Bold warning about step-calling-step
+   - Link to architecture docs
+   - Good and bad examples
+
+### All acceptance criteria met:
+- ✓ CLAUDE.md updated
+- ✓ Architecture documentation created
+- ✓ Clear examples provided
+- ✓ Guidelines for patterns
+- ✓ Anti-patterns documented
+<!-- SECTION:NOTES:END -->
