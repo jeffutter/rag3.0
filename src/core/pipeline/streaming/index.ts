@@ -25,6 +25,9 @@ export {
   tap,
   toArray,
 } from "./generators";
+// Export parallel processing utilities
+export type { ParallelOptions } from "./parallel";
+export { merge, parallelFilter, parallelMap } from "./parallel";
 // Export all types
 export type {
   AddToState,
