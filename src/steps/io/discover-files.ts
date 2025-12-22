@@ -6,23 +6,23 @@ import { createStep } from "../../core/pipeline/steps";
  * Input schema for the Discover Files step.
  */
 const DiscoverFilesInputSchema = z.object({
-	path: z.string(),
-	pattern: z.string().default("**/*.md"),
+  path: z.string(),
+  pattern: z.string().default("**/*.md"),
 });
 
 /**
  * Schema for individual file entries.
  */
 const FileEntrySchema = z.object({
-	path: z.string(),
-	name: z.string(),
+  path: z.string(),
+  name: z.string(),
 });
 
 /**
  * Output schema for the Discover Files step.
  */
 const DiscoverFilesOutputSchema = z.object({
-	files: z.array(FileEntrySchema),
+  files: z.array(FileEntrySchema),
 });
 
 type DiscoverFilesInput = z.input<typeof DiscoverFilesInputSchema>;
@@ -45,36 +45,36 @@ type DiscoverFilesOutput = z.infer<typeof DiscoverFilesOutputSchema>;
  * });
  * ```
  */
-export const discoverFilesStep = createStep<
-	DiscoverFilesInput,
-	DiscoverFilesOutput
->("discoverFiles", async ({ input }) => {
-	// Validate input
-	const validated = DiscoverFilesInputSchema.parse(input);
+export const discoverFilesStep = createStep<DiscoverFilesInput, DiscoverFilesOutput>(
+  "discoverFiles",
+  async ({ input }) => {
+    // Validate input
+    const validated = DiscoverFilesInputSchema.parse(input);
 
-	// Use Bun's Glob API to find files matching pattern
-	const glob = new Glob(validated.pattern);
-	const files: Array<{ path: string; name: string }> = [];
+    // Use Bun's Glob API to find files matching pattern
+    const glob = new Glob(validated.pattern);
+    const files: Array<{ path: string; name: string }> = [];
 
-	// Scan the directory
-	for await (const file of glob.scan({
-		cwd: validated.path,
-		absolute: false,
-	})) {
-		// Get the absolute path
-		const absolutePath = `${validated.path}/${file}`;
+    // Scan the directory
+    for await (const file of glob.scan({
+      cwd: validated.path,
+      absolute: false,
+    })) {
+      // Get the absolute path
+      const absolutePath = `${validated.path}/${file}`;
 
-		// Extract filename from path
-		const name = file.split("/").pop() || file;
+      // Extract filename from path
+      const name = file.split("/").pop() || file;
 
-		files.push({
-			path: absolutePath,
-			name,
-		});
-	}
+      files.push({
+        path: absolutePath,
+        name,
+      });
+    }
 
-	return { files };
-});
+    return { files };
+  },
+);
 
 // Export schemas for testing and validation
 export { DiscoverFilesInputSchema, DiscoverFilesOutputSchema };

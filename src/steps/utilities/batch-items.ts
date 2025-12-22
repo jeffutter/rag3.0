@@ -6,15 +6,15 @@ import { createStep } from "../../core/pipeline/steps";
  * Uses any type for items to allow generic batching.
  */
 const BatchItemsInputSchema = z.object({
-	items: z.array(z.any()),
-	batchSize: z.number().int().positive(),
+  items: z.array(z.any()),
+  batchSize: z.number().int().positive(),
 });
 
 /**
  * Output schema for the Batch Items step.
  */
 const BatchItemsOutputSchema = z.object({
-	batches: z.array(z.array(z.any())),
+  batches: z.array(z.array(z.any())),
 });
 
 type BatchItemsInput = z.input<typeof BatchItemsInputSchema>;
@@ -43,23 +43,20 @@ type BatchItemsOutput = z.infer<typeof BatchItemsOutputSchema>;
  * // result.data.batches = [[1,2,3], [4,5,6], [7,8,9], [10]]
  * ```
  */
-export const batchItemsStep = createStep<BatchItemsInput, BatchItemsOutput>(
-	"batchItems",
-	async ({ input }) => {
-		// Validate input
-		const validated = BatchItemsInputSchema.parse(input);
+export const batchItemsStep = createStep<BatchItemsInput, BatchItemsOutput>("batchItems", async ({ input }) => {
+  // Validate input
+  const validated = BatchItemsInputSchema.parse(input);
 
-		// Batch the items
-		// biome-ignore lint/suspicious/noExplicitAny: Generic batching utility accepts any item type
-		const batches: Array<Array<any>> = [];
+  // Batch the items
+  // biome-ignore lint/suspicious/noExplicitAny: Generic batching utility accepts any item type
+  const batches: Array<Array<any>> = [];
 
-		for (let i = 0; i < validated.items.length; i += validated.batchSize) {
-			batches.push(validated.items.slice(i, i + validated.batchSize));
-		}
+  for (let i = 0; i < validated.items.length; i += validated.batchSize) {
+    batches.push(validated.items.slice(i, i + validated.batchSize));
+  }
 
-		return { batches };
-	},
-);
+  return { batches };
+});
 
 // Export schemas for testing and validation
 export { BatchItemsInputSchema, BatchItemsOutputSchema };

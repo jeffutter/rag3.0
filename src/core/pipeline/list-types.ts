@@ -46,39 +46,33 @@ export type IsArray<T> = T extends unknown[] ? true : false;
  * @template TAccumulatedState - Object containing all previous step outputs
  * @template TContext - Additional runtime context
  */
-export type ListStep<
-	TInput,
-	TOutput,
-	TAccumulatedState = Record<string, never>,
-	TContext = unknown,
-> = Step<TInput[], TOutput[], TAccumulatedState, TContext>;
+export type ListStep<TInput, TOutput, TAccumulatedState = Record<string, never>, TContext = unknown> = Step<
+  TInput[],
+  TOutput[],
+  TAccumulatedState,
+  TContext
+>;
 
 /**
  * Computes the output type when mapping a step over an array.
  */
 export type MapStepOutput<TStep, TInput> = TInput extends unknown[]
-	? TStep extends Step<ArrayElement<TInput>, infer O, infer _S, infer _C>
-		? O[]
-		: never
-	: never;
+  ? TStep extends Step<ArrayElement<TInput>, infer O, infer _S, infer _C>
+    ? O[]
+    : never
+  : never;
 
 /**
  * Transform type for converting a single-item step to operate on arrays.
  */
 export type SingleToListTransform<TStep> =
-	TStep extends Step<infer I, infer O, infer S, infer C>
-		? Step<I[], O[], S, C>
-		: never;
+  TStep extends Step<infer I, infer O, infer S, infer C> ? Step<I[], O[], S, C> : never;
 
 /**
  * Transform type for steps that return arrays and need flattening.
  */
 export type FlatMapTransform<TStep> =
-	TStep extends Step<infer I, infer O, infer S, infer C>
-		? O extends unknown[]
-			? Step<I[], O, S, C>
-			: never
-		: never;
+  TStep extends Step<infer I, infer O, infer S, infer C> ? (O extends unknown[] ? Step<I[], O, S, C> : never) : never;
 
 /**
  * Transform type for batching operations.
@@ -93,17 +87,13 @@ export type FlattenTransform<T> = T extends (infer U)[][] ? U[] : never;
 /**
  * Extended AddToState that correctly handles array types in accumulated state.
  */
-export type AddToState<TState, TKey extends string, TValue> = BaseAddToState<
-	TState,
-	TKey,
-	TValue
->;
+export type AddToState<TState, TKey extends string, TValue> = BaseAddToState<TState, TKey, TValue>;
 
 /**
  * Helper type to validate that a step's input type matches an array element type.
  */
 export type ValidateMapInput<TStep, TArray> = TArray extends unknown[]
-	? TStep extends Step<ArrayElement<TArray>, unknown, unknown, unknown>
-		? true
-		: false
-	: false;
+  ? TStep extends Step<ArrayElement<TArray>, unknown, unknown, unknown>
+    ? true
+    : false
+  : false;

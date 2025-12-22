@@ -5,15 +5,15 @@ import { createStep } from "../../core/pipeline/steps";
  * Input schema for the Read File step.
  */
 const ReadFileInputSchema = z.object({
-	path: z.string(),
+  path: z.string(),
 });
 
 /**
  * Output schema for the Read File step.
  */
 const ReadFileOutputSchema = z.object({
-	content: z.string(),
-	source: z.string(),
+  content: z.string(),
+  source: z.string(),
 });
 
 type ReadFileInput = z.input<typeof ReadFileInputSchema>;
@@ -35,29 +35,26 @@ type ReadFileOutput = z.infer<typeof ReadFileOutputSchema>;
  * });
  * ```
  */
-export const readFileStep = createStep<ReadFileInput, ReadFileOutput>(
-	"readFile",
-	async ({ input }) => {
-		// Validate input
-		const validated = ReadFileInputSchema.parse(input);
+export const readFileStep = createStep<ReadFileInput, ReadFileOutput>("readFile", async ({ input }) => {
+  // Validate input
+  const validated = ReadFileInputSchema.parse(input);
 
-		// Use Bun.file() to read the file
-		const file = Bun.file(validated.path);
+  // Use Bun.file() to read the file
+  const file = Bun.file(validated.path);
 
-		// Check if file exists
-		if (!(await file.exists())) {
-			throw new Error(`File not found: ${validated.path}`);
-		}
+  // Check if file exists
+  if (!(await file.exists())) {
+    throw new Error(`File not found: ${validated.path}`);
+  }
 
-		// Read file content as text
-		const content = await file.text();
+  // Read file content as text
+  const content = await file.text();
 
-		return {
-			content,
-			source: validated.path,
-		};
-	},
-);
+  return {
+    content,
+    source: validated.path,
+  };
+});
 
 // Export schemas for testing and validation
 export { ReadFileInputSchema, ReadFileOutputSchema };

@@ -20,13 +20,9 @@ const LLM_MODEL = process.env.LLM_MODEL || "qwen2.5:7b";
 const LLM_API_KEY = process.env.LLM_API_KEY;
 
 // Embedding Configuration (for RAG)
-const EMBEDDING_BASE_URL =
-	process.env.EMBEDDING_BASE_URL ||
-	process.env.LLM_BASE_URL ||
-	"http://localhost:8080/v1";
+const EMBEDDING_BASE_URL = process.env.EMBEDDING_BASE_URL || process.env.LLM_BASE_URL || "http://localhost:8080/v1";
 const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL || "nomic-embed-text";
-const EMBEDDING_API_KEY =
-	process.env.EMBEDDING_API_KEY || process.env.LLM_API_KEY;
+const EMBEDDING_API_KEY = process.env.EMBEDDING_API_KEY || process.env.LLM_API_KEY;
 
 // Qdrant Configuration
 const QDRANT_URL = process.env.QDRANT_URL || "http://localhost:6333";
@@ -34,77 +30,68 @@ const QDRANT_API_KEY = process.env.QDRANT_API_KEY;
 const QDRANT_COLLECTION = process.env.QDRANT_COLLECTION || "rag_store";
 
 // Step 1: CLI Input - just validates and passes through the input
-const cliInputStep = createStep<string, string>(
-	"cli_input",
-	async ({ input }) => {
-		console.log(`\n[Input] ${input}\n`);
-		return input;
-	},
-);
+const cliInputStep = createStep<string, string>("cli_input", async ({ input }) => {
+  console.log(`\n[Input] ${input}\n`);
+  return input;
+});
 
 // Step 2: LLM Call - sends to the LLM with RAG tool support
 interface LLMContext {
-	llmClient: OpenAICompatibleClient;
-	model: string;
-	// biome-ignore lint/suspicious/noExplicitAny: Tools can have various argument types
-	tools: ToolDefinition<any>[];
+  llmClient: OpenAICompatibleClient;
+  model: string;
+  // biome-ignore lint/suspicious/noExplicitAny: Tools can have various argument types
+  tools: ToolDefinition<any>[];
 }
 
 // biome-ignore lint/complexity/noBannedTypes: Empty state for first step in pipeline
-const llmStep = createStep<string, CompletionResponse, {}, LLMContext>(
-	"llm_call",
-	async ({ input, context }) => {
-		console.log("[LLM] Sending to model with RAG tool support...");
+const llmStep = createStep<string, CompletionResponse, {}, LLMContext>("llm_call", async ({ input, context }) => {
+  console.log("[LLM] Sending to model with RAG tool support...");
 
-		const response = await context.llmClient.completeWithToolLoop(
-			{
-				model: context.model,
-				messages: [
-					{
-						role: "system",
-						content:
-							"You are a helpful assistant. You have access to a knowledge base search tool. Use it when the user asks about specific information that might be in their notes or documents. Be concise and clear.",
-					},
-					{ role: "user", content: input },
-				],
-				tools: context.tools,
-				toolChoice: "auto",
-				temperature: 0.7,
-			},
-			5,
-		); // Max 5 iterations for tool calls
+  const response = await context.llmClient.completeWithToolLoop(
+    {
+      model: context.model,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a helpful assistant. You have access to a knowledge base search tool. Use it when the user asks about specific information that might be in their notes or documents. Be concise and clear.",
+        },
+        { role: "user", content: input },
+      ],
+      tools: context.tools,
+      toolChoice: "auto",
+      temperature: 0.7,
+    },
+    5,
+  ); // Max 5 iterations for tool calls
 
-		console.log(
-			`[LLM] Received response (${response.usage.totalTokens} tokens)\n`,
-		);
-		return response;
-	},
-);
+  console.log(`[LLM] Received response (${response.usage.totalTokens} tokens)\n`);
+  return response;
+});
 
 // Step 3: CLI Output - extracts the message content and returns it
-const cliOutputStep = createStep<
-	CompletionResponse,
-	string,
-	{ cli_input: string; llm_call: CompletionResponse }
->("cli_output", async ({ input, state: _state }) => {
-	const output = input.message.content;
-	console.log(`[Output]\n${output}\n`);
+const cliOutputStep = createStep<CompletionResponse, string, { cli_input: string; llm_call: CompletionResponse }>(
+  "cli_output",
+  async ({ input, state: _state }) => {
+    const output = input.message.content;
+    console.log(`[Output]\n${output}\n`);
 
-	// Show token usage
-	console.log(
-		`[Usage] Prompt: ${input.usage.promptTokens}, Completion: ${input.usage.completionTokens}, Total: ${input.usage.totalTokens}`,
-	);
-	console.log(`[Finish Reason] ${input.finishReason}`);
+    // Show token usage
+    console.log(
+      `[Usage] Prompt: ${input.usage.promptTokens}, Completion: ${input.usage.completionTokens}, Total: ${input.usage.totalTokens}`,
+    );
+    console.log(`[Finish Reason] ${input.finishReason}`);
 
-	return output;
-});
+    return output;
+  },
+);
 
 // Main CLI function
 async function main() {
-	const args = process.argv.slice(2);
+  const args = process.argv.slice(2);
 
-	if (args.length === 0 || args[0] === "--help" || args[0] === "-h") {
-		console.log(`
+  if (args.length === 0 || args[0] === "--help" || args[0] === "-h") {
+    console.log(`
 LLM Test CLI with RAG Tool Support
 
 Usage:
@@ -139,101 +126,99 @@ Examples:
 
 Note: The LLM will automatically decide whether to use the RAG search tool based on your question.
     `);
-		process.exit(0);
-	}
+    process.exit(0);
+  }
 
-	const userInput = args.join(" ");
+  const userInput = args.join(" ");
 
-	console.log("=== LLM Pipeline Test with RAG ===");
-	console.log(`LLM Model: ${LLM_MODEL}`);
-	console.log(`LLM Endpoint: ${LLM_BASE_URL}`);
-	console.log(`Embedding Model: ${EMBEDDING_MODEL}`);
-	console.log(`Qdrant: ${QDRANT_URL}`);
-	console.log(`Collection: ${QDRANT_COLLECTION}`);
-	console.log("===================================\n");
+  console.log("=== LLM Pipeline Test with RAG ===");
+  console.log(`LLM Model: ${LLM_MODEL}`);
+  console.log(`LLM Endpoint: ${LLM_BASE_URL}`);
+  console.log(`Embedding Model: ${EMBEDDING_MODEL}`);
+  console.log(`Qdrant: ${QDRANT_URL}`);
+  console.log(`Collection: ${QDRANT_COLLECTION}`);
+  console.log("===================================\n");
 
-	// Initialize LLM client
-	const llmClientOptions: {
-		baseURL: string;
-		apiKey?: string;
-		timeout?: number;
-	} = {
-		baseURL: LLM_BASE_URL,
-		timeout: 120000,
-	};
+  // Initialize LLM client
+  const llmClientOptions: {
+    baseURL: string;
+    apiKey?: string;
+    timeout?: number;
+  } = {
+    baseURL: LLM_BASE_URL,
+    timeout: 120000,
+  };
 
-	if (LLM_API_KEY) {
-		llmClientOptions.apiKey = LLM_API_KEY;
-	}
+  if (LLM_API_KEY) {
+    llmClientOptions.apiKey = LLM_API_KEY;
+  }
 
-	const llmClient = new OpenAICompatibleClient(llmClientOptions);
+  const llmClient = new OpenAICompatibleClient(llmClientOptions);
 
-	// Initialize Qdrant client
-	const qdrantClientConfig: {
-		url: string;
-		apiKey?: string;
-	} = { url: QDRANT_URL };
+  // Initialize Qdrant client
+  const qdrantClientConfig: {
+    url: string;
+    apiKey?: string;
+  } = { url: QDRANT_URL };
 
-	if (QDRANT_API_KEY) {
-		qdrantClientConfig.apiKey = QDRANT_API_KEY;
-	}
+  if (QDRANT_API_KEY) {
+    qdrantClientConfig.apiKey = QDRANT_API_KEY;
+  }
 
-	const vectorClient = new VectorSearchClient(qdrantClientConfig);
+  const vectorClient = new VectorSearchClient(qdrantClientConfig);
 
-	// Create RAG search tool
-	const embeddingConfig: {
-		baseURL: string;
-		model: string;
-		apiKey?: string;
-	} = {
-		baseURL: EMBEDDING_BASE_URL,
-		model: EMBEDDING_MODEL,
-	};
+  // Create RAG search tool
+  const embeddingConfig: {
+    baseURL: string;
+    model: string;
+    apiKey?: string;
+  } = {
+    baseURL: EMBEDDING_BASE_URL,
+    model: EMBEDDING_MODEL,
+  };
 
-	if (EMBEDDING_API_KEY) {
-		embeddingConfig.apiKey = EMBEDDING_API_KEY;
-	}
+  if (EMBEDDING_API_KEY) {
+    embeddingConfig.apiKey = EMBEDDING_API_KEY;
+  }
 
-	const ragTool = createRAGSearchTool({
-		vectorClient,
-		embeddingConfig,
-		defaultCollection: QDRANT_COLLECTION,
-	});
+  const ragTool = createRAGSearchTool({
+    vectorClient,
+    embeddingConfig,
+    defaultCollection: QDRANT_COLLECTION,
+  });
 
-	// biome-ignore lint/suspicious/noExplicitAny: Tools can have various argument types
-	const tools: ToolDefinition<any>[] = [ragTool];
+  // biome-ignore lint/suspicious/noExplicitAny: Tools can have various argument types
+  const tools: ToolDefinition<any>[] = [ragTool];
 
-	// Build the pipeline
-	const pipeline = Pipeline.start<string, LLMContext>(() => ({
-		llmClient,
-		model: LLM_MODEL,
-		tools,
-	}))
-		.add("cli_input", cliInputStep)
-		.add("llm_call", llmStep)
-		.add("cli_output", cliOutputStep);
+  // Build the pipeline
+  const pipeline = Pipeline.start<string, LLMContext>(() => ({
+    llmClient,
+    model: LLM_MODEL,
+    tools,
+  }))
+    .add("cli_input", cliInputStep)
+    .add("llm_call", llmStep)
+    .add("cli_output", cliOutputStep);
 
-	// Execute the pipeline
-	try {
-		const result = await pipeline.execute(userInput);
+  // Execute the pipeline
+  try {
+    const result = await pipeline.execute(userInput);
 
-		if (result.success) {
-			console.log(
-				`\n✅ Pipeline completed in ${result.metadata.durationMs.toFixed(2)}ms`,
-			);
-			process.exit(0);
-		} else {
-			console.error("\n❌ Pipeline failed:");
-			console.error(`   Error: ${result.error.message}`);
-			console.error(`   Code: ${result.error.code}`);
-			console.error(`   Step: ${result.metadata.stepName}`);
-			process.exit(1);
-		}
-	} catch (error) {
-		console.error("\n❌ Unexpected error:");
-		console.error(error);
-		process.exit(1);
-	}
+    if (result.success) {
+      console.log(`\n✅ Pipeline completed in ${result.metadata.durationMs.toFixed(2)}ms`);
+      process.exit(0);
+    } else {
+      console.error("\n❌ Pipeline failed:");
+      console.error(`   Error: ${result.error.message}`);
+      console.error(`   Code: ${result.error.code}`);
+      console.error(`   Step: ${result.metadata.stepName}`);
+      process.exit(1);
+    }
+  } catch (error) {
+    console.error("\n❌ Unexpected error:");
+    console.error(error);
+    process.exit(1);
+  }
 }
 
 main();

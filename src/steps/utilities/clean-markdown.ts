@@ -12,43 +12,41 @@ import { createStep } from "../../core/pipeline/steps";
  * that don't add value in LLM context or embeddings.
  */
 const DEFAULT_HEADINGS_TO_REMOVE = [
-	"Project List",
-	"Due Today",
-	"Todoist Tasks",
-	"Daily Reading",
-	"Completed Today",
-	"Habit",
-	"Jira Tickets",
-	"Task",
-	"Bullet",
-	"File",
+  "Project List",
+  "Due Today",
+  "Todoist Tasks",
+  "Daily Reading",
+  "Completed Today",
+  "Habit",
+  "Jira Tickets",
+  "Task",
+  "Bullet",
+  "File",
 ] as const;
 
 /**
  * Base input schema (what users provide).
  */
 const CleanMarkdownInputBaseSchema = z.object({
-	content: z.string(),
-	headingsToRemove: z.array(z.string()).optional(),
+  content: z.string(),
+  headingsToRemove: z.array(z.string()).optional(),
 });
 
 /**
  * Processed input schema (after applying defaults).
  */
-const CleanMarkdownInputSchema = CleanMarkdownInputBaseSchema.transform(
-	(data) => ({
-		content: data.content,
-		headingsToRemove: data.headingsToRemove ?? [...DEFAULT_HEADINGS_TO_REMOVE],
-	}),
-);
+const CleanMarkdownInputSchema = CleanMarkdownInputBaseSchema.transform((data) => ({
+  content: data.content,
+  headingsToRemove: data.headingsToRemove ?? [...DEFAULT_HEADINGS_TO_REMOVE],
+}));
 
 /**
  * Output schema for the Clean Markdown step.
  */
 const CleanMarkdownOutputSchema = z.object({
-	content: z.string(),
-	tags: z.array(z.string()),
-	frontmatter: z.record(z.string(), z.any()).optional(),
+  content: z.string(),
+  tags: z.array(z.string()),
+  frontmatter: z.record(z.string(), z.any()).optional(),
 });
 
 // Type for what users provide (before transform)
@@ -59,8 +57,8 @@ type CleanMarkdownOutput = z.infer<typeof CleanMarkdownOutputSchema>;
  * Interface for sections to be removed from the markdown tree.
  */
 interface RemovalRange {
-	startIndex: number;
-	endIndex: number;
+  startIndex: number;
+  endIndex: number;
 }
 
 /**
@@ -72,48 +70,44 @@ interface RemovalRange {
  * @param headingsToRemove - Array of heading text strings to remove
  */
 function removeHeadings(headingsToRemove: string[]) {
-	return (tree: Root) => {
-		const indicesToRemove: RemovalRange[] = [];
+  return (tree: Root) => {
+    const indicesToRemove: RemovalRange[] = [];
 
-		visit(tree, "heading", (node: Heading, index, parent) => {
-			if (index === null || index === undefined || !parent) {
-				return;
-			}
+    visit(tree, "heading", (node: Heading, index, parent) => {
+      if (index === null || index === undefined || !parent) {
+        return;
+      }
 
-			// Get the heading text by concatenating all text children
-			const headingText = node.children
-				.filter((child) => child.type === "text")
-				.map((child) => ("value" in child ? child.value : ""))
-				.join("");
+      // Get the heading text by concatenating all text children
+      const headingText = node.children
+        .filter((child) => child.type === "text")
+        .map((child) => ("value" in child ? child.value : ""))
+        .join("");
 
-			// Check if this heading should be removed
-			if (headingsToRemove.includes(headingText)) {
-				// Find the range to remove (heading + all content until next heading of same/higher level)
-				const startIndex = index;
-				let endIndex = index;
+      // Check if this heading should be removed
+      if (headingsToRemove.includes(headingText)) {
+        // Find the range to remove (heading + all content until next heading of same/higher level)
+        const startIndex = index;
+        let endIndex = index;
 
-				// Look for the next heading at the same or higher level (lower or equal depth)
-				for (let i = index + 1; i < parent.children.length; i++) {
-					const nextNode = parent.children[i];
-					if (
-						nextNode &&
-						nextNode.type === "heading" &&
-						(nextNode as Heading).depth <= node.depth
-					) {
-						break;
-					}
-					endIndex = i;
-				}
+        // Look for the next heading at the same or higher level (lower or equal depth)
+        for (let i = index + 1; i < parent.children.length; i++) {
+          const nextNode = parent.children[i];
+          if (nextNode && nextNode.type === "heading" && (nextNode as Heading).depth <= node.depth) {
+            break;
+          }
+          endIndex = i;
+        }
 
-				indicesToRemove.push({ startIndex, endIndex });
-			}
-		});
+        indicesToRemove.push({ startIndex, endIndex });
+      }
+    });
 
-		// Remove sections in reverse order to maintain correct indices
-		indicesToRemove.reverse().forEach(({ startIndex, endIndex }) => {
-			tree.children.splice(startIndex, endIndex - startIndex + 1);
-		});
-	};
+    // Remove sections in reverse order to maintain correct indices
+    indicesToRemove.reverse().forEach(({ startIndex, endIndex }) => {
+      tree.children.splice(startIndex, endIndex - startIndex + 1);
+    });
+  };
 }
 
 /**
@@ -129,46 +123,42 @@ function removeHeadings(headingsToRemove: string[]) {
  * - Inline code (preserves formatting)
  */
 function removeFormatting() {
-	return (tree: Root) => {
-		visit(tree, (node, index, parent) => {
-			// Remove emphasis (italic), strong (bold), delete (strikethrough)
-			if (
-				node.type === "emphasis" ||
-				node.type === "strong" ||
-				node.type === "delete"
-			) {
-				if (parent && index !== null && index !== undefined) {
-					const formattingNode = node as Emphasis | Strong | Delete;
-					// Replace the formatting node with its children (the text content)
-					parent.children.splice(index, 1, ...formattingNode.children);
-					// Return SKIP and index to avoid re-processing the newly inserted children
-					return [SKIP, index];
-				}
-			}
-			return undefined;
+  return (tree: Root) => {
+    visit(tree, (node, index, parent) => {
+      // Remove emphasis (italic), strong (bold), delete (strikethrough)
+      if (node.type === "emphasis" || node.type === "strong" || node.type === "delete") {
+        if (parent && index !== null && index !== undefined) {
+          const formattingNode = node as Emphasis | Strong | Delete;
+          // Replace the formatting node with its children (the text content)
+          parent.children.splice(index, 1, ...formattingNode.children);
+          // Return SKIP and index to avoid re-processing the newly inserted children
+          return [SKIP, index];
+        }
+      }
+      return undefined;
 
-			// The following were intentionally excluded in the reference implementation:
+      // The following were intentionally excluded in the reference implementation:
 
-			// Convert links to just their text content (removes the URL)
-			// if (node.type === 'link') {
-			//   if (parent && index !== null) {
-			//     parent.children.splice(index, 1, ...node.children);
-			//     return [SKIP, index];
-			//   }
-			// }
+      // Convert links to just their text content (removes the URL)
+      // if (node.type === 'link') {
+      //   if (parent && index !== null) {
+      //     parent.children.splice(index, 1, ...node.children);
+      //     return [SKIP, index];
+      //   }
+      // }
 
-			// Remove inline code formatting but keep the text
-			// if (node.type === 'inlineCode') {
-			//   if (parent && index !== null) {
-			//     parent.children.splice(index, 1, {
-			//       type: 'text',
-			//       value: node.value
-			//     });
-			//     return [SKIP, index];
-			//   }
-			// }
-		});
-	};
+      // Remove inline code formatting but keep the text
+      // if (node.type === 'inlineCode') {
+      //   if (parent && index !== null) {
+      //     parent.children.splice(index, 1, {
+      //       type: 'text',
+      //       value: node.value
+      //     });
+      //     return [SKIP, index];
+      //   }
+      // }
+    });
+  };
 }
 
 /**
@@ -184,24 +174,24 @@ function removeFormatting() {
  */
 // biome-ignore lint/suspicious/noExplicitAny: Frontmatter data structure is dynamic and unknown
 function parseTags(frontmatterData: Record<string, any>): string[] {
-	const tags = frontmatterData.tags;
+  const tags = frontmatterData.tags;
 
-	if (!tags) {
-		return [];
-	}
+  if (!tags) {
+    return [];
+  }
 
-	if (typeof tags === "string") {
-		if (tags === "") {
-			return [];
-		}
-		return tags.split(",").map((tag) => tag.trim());
-	}
+  if (typeof tags === "string") {
+    if (tags === "") {
+      return [];
+    }
+    return tags.split(",").map((tag) => tag.trim());
+  }
 
-	if (Array.isArray(tags)) {
-		return tags;
-	}
+  if (Array.isArray(tags)) {
+    return tags;
+  }
 
-	return [];
+  return [];
 }
 
 /**
@@ -222,32 +212,32 @@ function parseTags(frontmatterData: Record<string, any>): string[] {
  *   });
  * ```
  */
-export const cleanMarkdownStep = createStep<
-	CleanMarkdownInput,
-	CleanMarkdownOutput
->("cleanMarkdown", async ({ input }) => {
-	// Validate input
-	const validated = CleanMarkdownInputSchema.parse(input);
+export const cleanMarkdownStep = createStep<CleanMarkdownInput, CleanMarkdownOutput>(
+  "cleanMarkdown",
+  async ({ input }) => {
+    // Validate input
+    const validated = CleanMarkdownInputSchema.parse(input);
 
-	// Parse frontmatter from the markdown content
-	const parsed = matter(validated.content);
+    // Parse frontmatter from the markdown content
+    const parsed = matter(validated.content);
 
-	// Process the markdown content through remark plugins
-	const modified = await remark()
-		.use(remarkGfm) // Enable GFM syntax including strikethrough
-		.use(removeHeadings, validated.headingsToRemove)
-		.use(removeFormatting)
-		.process(parsed.content);
+    // Process the markdown content through remark plugins
+    const modified = await remark()
+      .use(remarkGfm) // Enable GFM syntax including strikethrough
+      .use(removeHeadings, validated.headingsToRemove)
+      .use(removeFormatting)
+      .process(parsed.content);
 
-	// Parse tags from frontmatter
-	const tags = parseTags(parsed.data);
+    // Parse tags from frontmatter
+    const tags = parseTags(parsed.data);
 
-	return {
-		content: String(modified.value),
-		tags,
-		frontmatter: parsed.data,
-	};
-});
+    return {
+      content: String(modified.value),
+      tags,
+      frontmatter: parsed.data,
+    };
+  },
+);
 
 // Export schemas for testing and validation
 export { CleanMarkdownInputSchema, CleanMarkdownOutputSchema };

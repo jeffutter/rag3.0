@@ -5,15 +5,15 @@ import { createStep } from "../../core/pipeline/steps";
  * Input schema for the Add EOT step.
  */
 const AddEOTInputSchema = z.object({
-	content: z.string(),
-	eotToken: z.string().optional(),
+  content: z.string(),
+  eotToken: z.string().optional(),
 });
 
 /**
  * Output schema for the Add EOT step.
  */
 const AddEOTOutputSchema = z.object({
-	content: z.string(),
+  content: z.string(),
 });
 
 type AddEOTInput = z.input<typeof AddEOTInputSchema>;
@@ -38,20 +38,15 @@ type AddEOTOutput = z.infer<typeof AddEOTOutputSchema>;
  * // Returns: { content: 'Some text<|endoftext|>' }
  * ```
  */
-export const addEOTStep = createStep<AddEOTInput, AddEOTOutput>(
-	"addEOT",
-	async ({ input }) => {
-		// Validate input
-		const validated = AddEOTInputSchema.parse(input);
+export const addEOTStep = createStep<AddEOTInput, AddEOTOutput>("addEOT", async ({ input }) => {
+  // Validate input
+  const validated = AddEOTInputSchema.parse(input);
 
-		// Add EOT token if provided
-		const content = validated.eotToken
-			? validated.content + validated.eotToken
-			: validated.content;
+  // Add EOT token if provided
+  const content = validated.eotToken ? validated.content + validated.eotToken : validated.content;
 
-		return { content };
-	},
-);
+  return { content };
+});
 
 // Export schemas for testing and validation
 export { AddEOTInputSchema, AddEOTOutputSchema };

@@ -5,29 +5,29 @@ import { createStep } from "../../core/pipeline/steps";
  * Schema for embedded document chunks.
  */
 const EmbeddedDocumentSchema = z.object({
-	id: z.string().uuid(),
-	content: z.string(),
-	vector: z.array(z.number()),
-	metadata: z.record(z.string(), z.any()),
-	tags: z.array(z.string()),
+  id: z.string().uuid(),
+  content: z.string(),
+  vector: z.array(z.number()),
+  metadata: z.record(z.string(), z.any()),
+  tags: z.array(z.string()),
 });
 
 /**
  * Input schema for the Format Embed Output step.
  */
 const FormatEmbedOutputInputSchema = z.object({
-	documents: z.array(EmbeddedDocumentSchema),
-	totalFiles: z.number().int().nonnegative(),
-	totalChunks: z.number().int().nonnegative(),
+  documents: z.array(EmbeddedDocumentSchema),
+  totalFiles: z.number().int().nonnegative(),
+  totalChunks: z.number().int().nonnegative(),
 });
 
 /**
  * Output schema for the Format Embed Output step.
  */
 const FormatEmbedOutputOutputSchema = z.object({
-	documents: z.array(EmbeddedDocumentSchema),
-	totalFiles: z.number().int().nonnegative(),
-	totalChunks: z.number().int().nonnegative(),
+  documents: z.array(EmbeddedDocumentSchema),
+  totalFiles: z.number().int().nonnegative(),
+  totalChunks: z.number().int().nonnegative(),
 });
 
 type FormatEmbedOutputInput = z.input<typeof FormatEmbedOutputInputSchema>;
@@ -53,23 +53,15 @@ type EmbeddedDocument = z.infer<typeof EmbeddedDocumentSchema>;
  * });
  * ```
  */
-export const formatEmbedOutputStep = createStep<
-	FormatEmbedOutputInput,
-	FormatEmbedOutputOutput
->("formatEmbedOutput", async ({ input }) => {
-	// Validate and pass through
-	const validated = FormatEmbedOutputInputSchema.parse(input);
-	return validated;
-});
+export const formatEmbedOutputStep = createStep<FormatEmbedOutputInput, FormatEmbedOutputOutput>(
+  "formatEmbedOutput",
+  async ({ input }) => {
+    // Validate and pass through
+    const validated = FormatEmbedOutputInputSchema.parse(input);
+    return validated;
+  },
+);
 
 // Export schemas for testing and validation
-export {
-	FormatEmbedOutputInputSchema,
-	FormatEmbedOutputOutputSchema,
-	EmbeddedDocumentSchema,
-};
-export type {
-	FormatEmbedOutputInput,
-	FormatEmbedOutputOutput,
-	EmbeddedDocument,
-};
+export { FormatEmbedOutputInputSchema, FormatEmbedOutputOutputSchema, EmbeddedDocumentSchema };
+export type { FormatEmbedOutputInput, FormatEmbedOutputOutput, EmbeddedDocument };

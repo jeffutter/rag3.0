@@ -7,30 +7,30 @@ import { createStep } from "../../core/pipeline/steps";
  * Input schema for the Split Markdown step.
  */
 const SplitMarkdownInputSchema = z.object({
-	content: z.string(),
-	source: z.string().optional(),
-	metadata: z.record(z.string(), z.any()).optional().default({}),
-	minChunkSize: z.number().optional().default(300),
-	maxChunkSize: z.number().optional().default(1000),
-	chunkOverlap: z.number().optional().default(100),
+  content: z.string(),
+  source: z.string().optional(),
+  metadata: z.record(z.string(), z.any()).optional().default({}),
+  minChunkSize: z.number().optional().default(300),
+  maxChunkSize: z.number().optional().default(1000),
+  chunkOverlap: z.number().optional().default(100),
 });
 
 /**
  * Schema for individual chunks.
  */
 const ChunkSchema = z.object({
-	id: z.string().uuid(),
-	content: z.string(),
-	metadata: z.record(z.string(), z.any()),
-	index: z.number(),
-	length: z.number(),
+  id: z.string().uuid(),
+  content: z.string(),
+  metadata: z.record(z.string(), z.any()),
+  index: z.number(),
+  length: z.number(),
 });
 
 /**
  * Output schema for the Split Markdown step.
  */
 const SplitMarkdownOutputSchema = z.object({
-	chunks: z.array(ChunkSchema),
+  chunks: z.array(ChunkSchema),
 });
 
 type SplitMarkdownInput = z.input<typeof SplitMarkdownInputSchema>;
@@ -40,9 +40,9 @@ type SplitMarkdownOutput = z.infer<typeof SplitMarkdownOutputSchema>;
  * Options for smart markdown splitting.
  */
 interface SmartSplitOptions {
-	minChunkSize: number;
-	maxChunkSize: number;
-	chunkOverlap: number;
+  minChunkSize: number;
+  maxChunkSize: number;
+  chunkOverlap: number;
 }
 
 /**
@@ -60,54 +60,51 @@ interface SmartSplitOptions {
  * @returns Array of LangChain Document objects with pageContent and metadata
  */
 async function smartSplitMarkdown(
-	text: string,
-	options: SmartSplitOptions,
-	// biome-ignore lint/suspicious/noExplicitAny: Metadata structure is dynamic and unknown
+  text: string,
+  options: SmartSplitOptions,
+  // biome-ignore lint/suspicious/noExplicitAny: Metadata structure is dynamic and unknown
 ): Promise<Array<{ pageContent: string; metadata: Record<string, any> }>> {
-	const { minChunkSize, maxChunkSize, chunkOverlap } = options;
+  const { minChunkSize, maxChunkSize, chunkOverlap } = options;
 
-	// Stage 1: Markdown-aware split with larger chunk size
-	// This respects markdown structure (headings, lists, code blocks, etc.)
-	const markdownSplitter = RecursiveCharacterTextSplitter.fromLanguage(
-		"markdown",
-		{
-			chunkSize: maxChunkSize * 2,
-			chunkOverlap: 0,
-		},
-	);
+  // Stage 1: Markdown-aware split with larger chunk size
+  // This respects markdown structure (headings, lists, code blocks, etc.)
+  const markdownSplitter = RecursiveCharacterTextSplitter.fromLanguage("markdown", {
+    chunkSize: maxChunkSize * 2,
+    chunkOverlap: 0,
+  });
 
-	const initialDocs = await markdownSplitter.createDocuments([text]);
+  const initialDocs = await markdownSplitter.createDocuments([text]);
 
-	// Stage 2: Character-based refinement splitter for oversized chunks
-	const charSplitter = new RecursiveCharacterTextSplitter({
-		chunkSize: maxChunkSize,
-		chunkOverlap: chunkOverlap,
-	});
+  // Stage 2: Character-based refinement splitter for oversized chunks
+  const charSplitter = new RecursiveCharacterTextSplitter({
+    chunkSize: maxChunkSize,
+    chunkOverlap: chunkOverlap,
+  });
 
-	const finalChunks: Array<{
-		pageContent: string;
-		// biome-ignore lint/suspicious/noExplicitAny: Metadata structure is dynamic and unknown
-		metadata: Record<string, any>;
-	}> = [];
+  const finalChunks: Array<{
+    pageContent: string;
+    // biome-ignore lint/suspicious/noExplicitAny: Metadata structure is dynamic and unknown
+    metadata: Record<string, any>;
+  }> = [];
 
-	// Process each chunk based on its size
-	for (const doc of initialDocs) {
-		const contentLength = doc.pageContent.length;
+  // Process each chunk based on its size
+  for (const doc of initialDocs) {
+    const contentLength = doc.pageContent.length;
 
-		if (contentLength < minChunkSize) {
-			// Small chunks: preserve as-is
-			finalChunks.push(doc);
-		} else if (contentLength > maxChunkSize) {
-			// Large chunks: further split with overlap
-			const subChunks = await charSplitter.splitDocuments([doc]);
-			finalChunks.push(...subChunks);
-		} else {
-			// Medium chunks: preserve as-is (optimal size)
-			finalChunks.push(doc);
-		}
-	}
+    if (contentLength < minChunkSize) {
+      // Small chunks: preserve as-is
+      finalChunks.push(doc);
+    } else if (contentLength > maxChunkSize) {
+      // Large chunks: further split with overlap
+      const subChunks = await charSplitter.splitDocuments([doc]);
+      finalChunks.push(...subChunks);
+    } else {
+      // Medium chunks: preserve as-is (optimal size)
+      finalChunks.push(doc);
+    }
+  }
 
-	return finalChunks;
+  return finalChunks;
 }
 
 /**
@@ -124,28 +121,28 @@ async function smartSplitMarkdown(
  * @returns A valid UUID v4 string with last byte set to 0
  */
 function stringToBaseUUID(sourceString: string): string {
-	// Compute SHA-256 hash
-	const hash = createHash("sha256").update(sourceString).digest();
+  // Compute SHA-256 hash
+  const hash = createHash("sha256").update(sourceString).digest();
 
-	// Take first 16 bytes for UUID
-	const uuidBytes = hash.subarray(0, 16);
+  // Take first 16 bytes for UUID
+  const uuidBytes = hash.subarray(0, 16);
 
-	// Reserve last byte for chunk index
-	uuidBytes[15] = 0;
+  // Reserve last byte for chunk index
+  uuidBytes[15] = 0;
 
-	// Set version to 4 (random UUID) - byte 6, bits 4-7 = 0100
-	// biome-ignore lint/style/noNonNullAssertion: Index 6 is guaranteed to exist in 16-byte buffer
-	uuidBytes[6] = (uuidBytes[6]! & 0x0f) | 0x40;
+  // Set version to 4 (random UUID) - byte 6, bits 4-7 = 0100
+  // biome-ignore lint/style/noNonNullAssertion: Index 6 is guaranteed to exist in 16-byte buffer
+  uuidBytes[6] = (uuidBytes[6]! & 0x0f) | 0x40;
 
-	// Set variant to RFC 4122 - byte 8, bits 6-7 = 10
-	// biome-ignore lint/style/noNonNullAssertion: Index 8 is guaranteed to exist in 16-byte buffer
-	uuidBytes[8] = (uuidBytes[8]! & 0x3f) | 0x80;
+  // Set variant to RFC 4122 - byte 8, bits 6-7 = 10
+  // biome-ignore lint/style/noNonNullAssertion: Index 8 is guaranteed to exist in 16-byte buffer
+  uuidBytes[8] = (uuidBytes[8]! & 0x3f) | 0x80;
 
-	// Convert to hex string
-	const hex = uuidBytes.toString("hex");
+  // Convert to hex string
+  const hex = uuidBytes.toString("hex");
 
-	// Format as UUID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-	return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+  // Format as UUID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
 }
 
 /**
@@ -162,23 +159,23 @@ function stringToBaseUUID(sourceString: string): string {
  * @throws Error if chunkIndex is outside valid range (0-255)
  */
 function getChunkUUID(sourceString: string, chunkIndex: number): string {
-	if (chunkIndex < 0 || chunkIndex > 255) {
-		throw new Error("Chunk index must be between 0 and 255");
-	}
+  if (chunkIndex < 0 || chunkIndex > 255) {
+    throw new Error("Chunk index must be between 0 and 255");
+  }
 
-	// Get base UUID (with last byte = 0)
-	const baseUUID = stringToBaseUUID(sourceString);
+  // Get base UUID (with last byte = 0)
+  const baseUUID = stringToBaseUUID(sourceString);
 
-	// Convert UUID to bytes
-	const hex = baseUUID.replace(/-/g, "");
-	const bytes = Buffer.from(hex, "hex");
+  // Convert UUID to bytes
+  const hex = baseUUID.replace(/-/g, "");
+  const bytes = Buffer.from(hex, "hex");
 
-	// Set last byte to chunk index
-	bytes[15] = chunkIndex;
+  // Set last byte to chunk index
+  bytes[15] = chunkIndex;
 
-	// Convert back to UUID string
-	const newHex = bytes.toString("hex");
-	return `${newHex.slice(0, 8)}-${newHex.slice(8, 12)}-${newHex.slice(12, 16)}-${newHex.slice(16, 20)}-${newHex.slice(20, 32)}`;
+  // Convert back to UUID string
+  const newHex = bytes.toString("hex");
+  return `${newHex.slice(0, 8)}-${newHex.slice(8, 12)}-${newHex.slice(12, 16)}-${newHex.slice(16, 20)}-${newHex.slice(20, 32)}`;
 }
 
 /**
@@ -194,27 +191,27 @@ function getChunkUUID(sourceString: string, chunkIndex: number): string {
  * @returns true if chunk is valid, false if it should be filtered out
  */
 function isValidChunk(content: string): boolean {
-	const trimmed = content.trim();
+  const trimmed = content.trim();
 
-	// Filter out empty or whitespace-only chunks
-	if (trimmed.length === 0) return false;
+  // Filter out empty or whitespace-only chunks
+  if (trimmed.length === 0) return false;
 
-	// Filter out chunks that are just markdown fences
-	if (trimmed === "```" || trimmed === "~~~") return false;
+  // Filter out chunks that are just markdown fences
+  if (trimmed === "```" || trimmed === "~~~") return false;
 
-	// Filter out chunks that are just punctuation/symbols
-	if (/^[^\w\s]+$/.test(trimmed)) return false;
+  // Filter out chunks that are just punctuation/symbols
+  if (/^[^\w\s]+$/.test(trimmed)) return false;
 
-	// Filter out chunks that are just a single heading with no content
-	// Matches: # Heading, ## Heading, etc. with nothing after
-	if (/^#{1,6}\s+.+$/.test(trimmed) && !trimmed.includes("\n")) return false;
+  // Filter out chunks that are just a single heading with no content
+  // Matches: # Heading, ## Heading, etc. with nothing after
+  if (/^#{1,6}\s+.+$/.test(trimmed) && !trimmed.includes("\n")) return false;
 
-	// Also catch headings that only have whitespace after them
-	const lines = trimmed.split("\n").filter((line) => line.trim().length > 0);
-	// biome-ignore lint/style/noNonNullAssertion: Index 0 is guaranteed to exist when length === 1
-	if (lines.length === 1 && /^#{1,6}\s+.+$/.test(lines[0]!)) return false;
+  // Also catch headings that only have whitespace after them
+  const lines = trimmed.split("\n").filter((line) => line.trim().length > 0);
+  // biome-ignore lint/style/noNonNullAssertion: Index 0 is guaranteed to exist when length === 1
+  if (lines.length === 1 && /^#{1,6}\s+.+$/.test(lines[0]!)) return false;
 
-	return true;
+  return true;
 }
 
 /**
@@ -245,49 +242,45 @@ function isValidChunk(content: string): boolean {
  *   });
  * ```
  */
-export const splitMarkdownStep = createStep<
-	SplitMarkdownInput,
-	SplitMarkdownOutput
->("splitMarkdown", async ({ input }) => {
-	// Validate and apply defaults
-	const validated = SplitMarkdownInputSchema.parse(input);
+export const splitMarkdownStep = createStep<SplitMarkdownInput, SplitMarkdownOutput>(
+  "splitMarkdown",
+  async ({ input }) => {
+    // Validate and apply defaults
+    const validated = SplitMarkdownInputSchema.parse(input);
 
-	// Handle empty content
-	if (!validated.content || validated.content.trim().length === 0) {
-		return { chunks: [] };
-	}
+    // Handle empty content
+    if (!validated.content || validated.content.trim().length === 0) {
+      return { chunks: [] };
+    }
 
-	// Split the content using two-stage approach
-	const chunks = await smartSplitMarkdown(validated.content, {
-		minChunkSize: validated.minChunkSize,
-		maxChunkSize: validated.maxChunkSize,
-		chunkOverlap: validated.chunkOverlap,
-	});
+    // Split the content using two-stage approach
+    const chunks = await smartSplitMarkdown(validated.content, {
+      minChunkSize: validated.minChunkSize,
+      maxChunkSize: validated.maxChunkSize,
+      chunkOverlap: validated.chunkOverlap,
+    });
 
-	// Filter and process chunks
-	const validChunks = chunks
-		.filter((chunk) => isValidChunk(chunk.pageContent))
-		.map((chunk, index) => {
-			// Validate chunk index doesn't exceed 255 (byte limitation)
-			if (validated.source && index > 255) {
-				throw new Error(
-					`Document produces ${chunks.length} chunks, exceeding maximum of 255 chunks per document`,
-				);
-			}
+    // Filter and process chunks
+    const validChunks = chunks
+      .filter((chunk) => isValidChunk(chunk.pageContent))
+      .map((chunk, index) => {
+        // Validate chunk index doesn't exceed 255 (byte limitation)
+        if (validated.source && index > 255) {
+          throw new Error(`Document produces ${chunks.length} chunks, exceeding maximum of 255 chunks per document`);
+        }
 
-			return {
-				id: validated.source
-					? getChunkUUID(validated.source, index)
-					: randomUUID(),
-				content: chunk.pageContent,
-				metadata: { ...validated.metadata, ...chunk.metadata },
-				index,
-				length: chunk.pageContent.length,
-			};
-		});
+        return {
+          id: validated.source ? getChunkUUID(validated.source, index) : randomUUID(),
+          content: chunk.pageContent,
+          metadata: { ...validated.metadata, ...chunk.metadata },
+          index,
+          length: chunk.pageContent.length,
+        };
+      });
 
-	return { chunks: validChunks };
-});
+    return { chunks: validChunks };
+  },
+);
 
 // Export schemas for testing and validation
 export { SplitMarkdownInputSchema, SplitMarkdownOutputSchema };
