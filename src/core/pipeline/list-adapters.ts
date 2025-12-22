@@ -6,10 +6,12 @@
  * - Helper functions for common list operations
  * - Error handling strategies for list processing
  * - Partial success result types
+ * - Parallel execution with concurrency control
  */
 
 import type { ListStep } from "./list-types";
 import type {
+	ListOperationMetadata,
 	Step,
 	StepError,
 	StepExecutionContext,
@@ -50,6 +52,128 @@ export interface SingleToListOptions {
 	errorStrategy?: ListErrorStrategy;
 	/** Whether to execute in parallel (default: false) */
 	parallel?: boolean;
+	/** Maximum number of concurrent executions (default: 10, only applies when parallel=true) */
+	concurrencyLimit?: number;
+}
+
+/**
+ * Helper to calculate percentile from sorted array of numbers.
+ */
+function percentile(sortedArray: number[], p: number): number {
+	if (sortedArray.length === 0) return 0;
+	const index = Math.ceil((p / 100) * sortedArray.length) - 1;
+	return sortedArray[Math.max(0, index)] ?? 0;
+}
+
+/**
+ * Helper to calculate timing statistics from an array of durations.
+ */
+function calculateTimingStats(durations: number[]): {
+	min: number;
+	max: number;
+	avg: number;
+	p50: number;
+	p95: number;
+	p99: number;
+} {
+	if (durations.length === 0) {
+		return { min: 0, max: 0, avg: 0, p50: 0, p95: 0, p99: 0 };
+	}
+
+	const sorted = [...durations].sort((a, b) => a - b);
+	const sum = durations.reduce((acc, d) => acc + d, 0);
+
+	return {
+		min: sorted[0] ?? 0,
+		max: sorted[sorted.length - 1] ?? 0,
+		avg: sum / durations.length,
+		p50: percentile(sorted, 50),
+		p95: percentile(sorted, 95),
+		p99: percentile(sorted, 99),
+	};
+}
+
+/**
+ * Execute items in parallel with a configurable concurrency limit.
+ *
+ * This helper prevents overwhelming the system by limiting the number
+ * of concurrent operations. Maintains order of results.
+ *
+ * **Performance Characteristics:**
+ * - Prevents system overload by limiting concurrent operations
+ * - Ideal for I/O-bound tasks (API calls, file I/O, database queries)
+ * - Results maintain input order regardless of completion order
+ * - Recommended limits: 5-10 for API calls, 50-100 for CPU-bound tasks
+ *
+ * **Error Handling:**
+ * - If any executor throws, the entire operation rejects
+ * - Use within singleToList with error strategies for partial success handling
+ *
+ * @template TInput - The type of items being processed
+ * @template TOutput - The type of results
+ * @param items - Array of items to process
+ * @param executor - Async function to execute for each item
+ * @param concurrencyLimit - Maximum number of concurrent executions (default: 10)
+ * @returns Array of results and their timings
+ *
+ * @example
+ * const results = await executeParallel(
+ *   [1, 2, 3, 4, 5],
+ *   async (item) => processItem(item),
+ *   2 // Process 2 items at a time
+ * );
+ */
+export async function executeParallel<TInput, TOutput>(
+	items: TInput[],
+	executor: (
+		item: TInput,
+		index: number,
+	) => Promise<{ result: TOutput; durationMs: number }>,
+	concurrencyLimit = 10,
+): Promise<Array<{ result: TOutput; durationMs: number }>> {
+	const results: Array<{ result: TOutput; durationMs: number }> = new Array(
+		items.length,
+	);
+	let activeCount = 0;
+	let currentIndex = 0;
+
+	return new Promise((resolve, reject) => {
+		const processNext = () => {
+			// If all items are processed and no active tasks, we're done
+			if (currentIndex >= items.length && activeCount === 0) {
+				resolve(results);
+				return;
+			}
+
+			// Start new tasks up to the concurrency limit
+			while (activeCount < concurrencyLimit && currentIndex < items.length) {
+				const index = currentIndex;
+				const item = items[index];
+				currentIndex++;
+
+				if (item === undefined) {
+					processNext();
+					continue;
+				}
+
+				activeCount++;
+
+				executor(item, index)
+					.then((res) => {
+						results[index] = res;
+					})
+					.catch((error) => {
+						reject(error);
+					})
+					.finally(() => {
+						activeCount--;
+						processNext();
+					});
+			}
+		};
+
+		processNext();
+	});
 }
 
 /**
@@ -78,8 +202,11 @@ export function singleToList<
 	step: Step<TInput, TOutput, TAccumulatedState, TContext>,
 	options: SingleToListOptions = {},
 ): ListStep<TInput, TOutput, TAccumulatedState, TContext> {
-	const { errorStrategy = ListErrorStrategy.FAIL_FAST, parallel = false } =
-		options;
+	const {
+		errorStrategy = ListErrorStrategy.FAIL_FAST,
+		parallel = false,
+		concurrencyLimit = 10,
+	} = options;
 
 	const listStep: ListStep<TInput, TOutput, TAccumulatedState, TContext> = {
 		name: `${step.name}_list`,
@@ -87,31 +214,45 @@ export function singleToList<
 			ctx: StepExecutionContext<TInput[], TAccumulatedState, TContext>,
 		): Promise<StepResult<TOutput[]>> => {
 			const startTime = Date.now();
-			const results: StepResult<TOutput>[] = [];
+			const results: Array<StepResult<TOutput> & { itemDurationMs: number }> =
+				[];
+			const itemTimings: number[] = [];
 
 			try {
 				if (parallel) {
-					// Execute all items in parallel
-					results.push(
-						...(await Promise.all(
-							ctx.input.map((item) =>
-								step.execute({
-									input: item,
-									state: ctx.state,
-									context: ctx.context,
-								}),
-							),
-						)),
+					// Execute items in parallel with concurrency control
+					const parallelResults = await executeParallel(
+						ctx.input,
+						async (item, _index) => {
+							const itemStart = Date.now();
+							const result = await step.execute({
+								input: item,
+								state: ctx.state,
+								context: ctx.context,
+							});
+							const itemDuration = Date.now() - itemStart;
+							itemTimings.push(itemDuration);
+							return {
+								result: { ...result, itemDurationMs: itemDuration },
+								durationMs: itemDuration,
+							};
+						},
+						concurrencyLimit,
 					);
+
+					results.push(...parallelResults.map((r) => r.result));
 				} else {
 					// Execute items sequentially
 					for (const item of ctx.input) {
+						const itemStart = Date.now();
 						const result = await step.execute({
 							input: item,
 							state: ctx.state,
 							context: ctx.context,
 						});
-						results.push(result);
+						const itemDuration = Date.now() - itemStart;
+						itemTimings.push(itemDuration);
+						results.push({ ...result, itemDurationMs: itemDuration });
 
 						// FAIL_FAST: Stop on first error
 						if (
@@ -119,6 +260,15 @@ export function singleToList<
 							errorStrategy === ListErrorStrategy.FAIL_FAST
 						) {
 							const endTime = Date.now();
+							const listMetadata: ListOperationMetadata = {
+								totalItems: ctx.input.length,
+								successCount: results.filter((r) => r.success).length,
+								failureCount: 1,
+								skippedCount: ctx.input.length - results.length,
+								itemTimings: calculateTimingStats(itemTimings),
+								executionStrategy: "sequential",
+							};
+
 							return {
 								success: false,
 								error: result.error,
@@ -127,6 +277,7 @@ export function singleToList<
 									startTime,
 									endTime,
 									durationMs: endTime - startTime,
+									listMetadata,
 								},
 							};
 						}
@@ -149,10 +300,22 @@ export function singleToList<
 
 				const endTime = Date.now();
 
+				// Build list metadata
+				const listMetadata: ListOperationMetadata = {
+					totalItems: ctx.input.length,
+					successCount: successes.length,
+					failureCount: failures.length,
+					skippedCount: 0,
+					itemTimings: calculateTimingStats(itemTimings),
+					executionStrategy: parallel ? "parallel" : "sequential",
+					...(parallel && { concurrencyLimit }),
+				};
+
 				// Handle based on error strategy
 				if (failures.length > 0) {
 					if (errorStrategy === ListErrorStrategy.FAIL_FAST) {
-						// Should not reach here due to early return above
+						// Should not reach here due to early return above (for sequential)
+						// For parallel execution, we still get here
 						const firstFailure = failures[0];
 						if (!firstFailure) {
 							throw new Error("Unexpected: failures array is empty");
@@ -165,6 +328,7 @@ export function singleToList<
 								startTime,
 								endTime,
 								durationMs: endTime - startTime,
+								listMetadata,
 							},
 						};
 					}
@@ -184,11 +348,13 @@ export function singleToList<
 								startTime,
 								endTime,
 								durationMs: endTime - startTime,
+								listMetadata,
 							},
 						};
 					}
 
 					// SKIP_FAILED: Return only successes
+					listMetadata.skippedCount = failures.length;
 					return {
 						success: true,
 						data: successes,
@@ -197,6 +363,7 @@ export function singleToList<
 							startTime,
 							endTime,
 							durationMs: endTime - startTime,
+							listMetadata,
 						},
 					};
 				}
@@ -210,10 +377,30 @@ export function singleToList<
 						startTime,
 						endTime,
 						durationMs: endTime - startTime,
+						listMetadata,
 					},
 				};
 			} catch (error) {
 				const endTime = Date.now();
+				const baseMetadata = {
+					totalItems: ctx.input.length,
+					successCount: 0,
+					failureCount: ctx.input.length,
+					skippedCount: 0,
+					executionStrategy: (parallel ? "parallel" : "sequential") as
+						| "sequential"
+						| "parallel",
+					...(parallel && { concurrencyLimit }),
+				};
+
+				const listMetadata: ListOperationMetadata =
+					itemTimings.length > 0
+						? {
+								...baseMetadata,
+								itemTimings: calculateTimingStats(itemTimings),
+							}
+						: baseMetadata;
+
 				return {
 					success: false,
 					error: {
@@ -227,6 +414,7 @@ export function singleToList<
 						startTime,
 						endTime,
 						durationMs: endTime - startTime,
+						listMetadata,
 					},
 				};
 			}

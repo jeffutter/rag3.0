@@ -33,7 +33,9 @@
       "Bash(chmod:*)",
       "Bash(biome check:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(timeout 120 bun test:*)",
+      "Bash(timeout 180 bun test:*)"
     ],
     "deny": [],
     "ask": []

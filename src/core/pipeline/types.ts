@@ -28,6 +28,28 @@ export interface StepMetadata {
 	durationMs: number;
 	traceId?: string;
 	spanId?: string;
+	// List operation metadata (optional)
+	listMetadata?: ListOperationMetadata;
+}
+
+export interface ListOperationMetadata {
+	totalItems: number;
+	successCount: number;
+	failureCount: number;
+	skippedCount: number;
+	// Per-item timing statistics
+	itemTimings?: {
+		min: number;
+		max: number;
+		avg: number;
+		p50: number;
+		p95: number;
+		p99: number;
+	};
+	// Execution strategy used
+	executionStrategy: "sequential" | "parallel";
+	// Concurrency limit (for parallel execution)
+	concurrencyLimit?: number;
 }
 
 export interface StepError {

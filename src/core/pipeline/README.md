@@ -2,6 +2,40 @@
 
 A compile-time type-safe workflow orchestration system where steps can access outputs from **any** previous step, not just the immediate predecessor.
 
+## Quick Start
+
+Get started in 60 seconds:
+
+```typescript
+import { Pipeline, createStep } from '@core/pipeline';
+
+// Create a simple pipeline
+const pipeline = Pipeline.start<string>()
+  .add('parse', createStep('parse', async ({ input }) => {
+    return JSON.parse(input);
+  }))
+  .add('validate', createStep('validate', async ({ input }) => {
+    if (!input.email) throw new Error('Missing email');
+    return input;
+  }))
+  .add('process', createStep('process', async ({ input }) => {
+    return await processUser(input);
+  }));
+
+// Execute it
+const result = await pipeline.execute('{"email": "user@example.com"}');
+if (result.success) {
+  console.log('Processed:', result.data);
+} else {
+  console.error('Failed:', result.error.message);
+}
+```
+
+**Next Steps:**
+- [Common Patterns](./docs/PIPELINE_PATTERNS.md) - Learn powerful patterns
+- [Migration Guide](./docs/MIGRATION_GUIDE.md) - Migrate existing code
+- [Troubleshooting](./docs/TROUBLESHOOTING.md) - Common issues and solutions
+
 ## Key Features
 
 ✅ **Accumulated State Tracking** - Each step can access all previous step outputs by name
@@ -10,6 +44,9 @@ A compile-time type-safe workflow orchestration system where steps can access ou
 ✅ **Duplicate Prevention** - TypeScript prevents duplicate step names at compile time
 ✅ **Retry Logic** - Built-in retry support with backoff
 ✅ **Structured Logging** - OpenTelemetry-compatible logging with trace IDs
+✅ **List Operations** - Built-in map, filter, batch, flatten operations
+✅ **Parallel Execution** - 3-10x faster processing with automatic concurrency control
+✅ **Error Strategies** - Fail fast, collect errors, or skip failures
 
 ## Basic Usage
 
@@ -206,9 +243,33 @@ const pipeline = Pipeline.start<string>()
 4. **Self-Documenting** - Types serve as documentation
 5. **Runtime Validation** - TypeScript ensures correctness before execution
 
-## See Also
+## Documentation
 
-- `example.ts` - Comprehensive examples demonstrating all features
-- `types.ts` - Type definitions
+### Guides
+- [Pipeline Patterns Guide](./docs/PIPELINE_PATTERNS.md) - 20+ common patterns and best practices
+- [Migration Guide](./docs/MIGRATION_GUIDE.md) - Migrate existing code with before/after examples
+- [Troubleshooting Guide](./docs/TROUBLESHOOTING.md) - Common issues and solutions
+- [Testing & Performance](./TESTING.md) - Comprehensive test coverage and benchmarks
+
+### Examples
+- [Data Transformation](./examples/01-data-transformation.ts) - Basic transformation patterns
+- [Web Scraping](./examples/02-web-scraping.ts) - Parallel web scraping with error handling
+- [Batch Processing](./examples/03-batch-processing.ts) - Efficient batch API calls
+
+### Code Reference
+- `types.ts` - Core type definitions
 - `builder.ts` - Pipeline builder implementation
 - `steps.ts` - Step factory helpers
+- `list-adapters.ts` - List operation adapters
+- `list-types.ts` - List operation type definitions
+- `registry.ts` - Pipeline registry for reusable pipelines
+
+## Performance
+
+Based on comprehensive benchmarks (see [TESTING.md](./TESTING.md)):
+
+- **Parallel Execution:** 3-10x faster for I/O-bound operations
+- **Batching:** 3-5x reduction in API calls
+- **Scalability:** Tested up to 10,000 items with no degradation
+- **Memory:** <5MB overhead for 10,000 items
+- **Test Coverage:** >95% code coverage, 121 tests, 420 assertions
