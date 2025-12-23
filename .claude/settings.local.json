@@ -43,7 +43,8 @@
       "Bash(xargs ls:*)",
       "Bash(git checkout:*)",
       "Bash(timeout 10 bun run:*)",
-      "Bash(timeout 5 bun run:*)"
+      "Bash(timeout 5 bun run:*)",
+      "Bash(jj log:*)"
     ],
     "deny": [],
     "ask": []

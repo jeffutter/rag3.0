@@ -90,14 +90,20 @@ async function main() {
       llmClient,
       tools: toolRegistry.getAll(),
       model: config.llm.model,
-      systemPrompt: `You are a helpful assistant with access to a personal knowledge base.
-
-When asked a question:
-1. Use the search_knowledge_base tool to find relevant information
-2. Synthesize the information into a clear, helpful response
-3. Cite sources when relevant
-
+      systemPrompt: `You are an expert in calling tool functions. You will receive a problem and a set of possible tool functions. Based on the problem, you need to make one or more function/tool calls to achieve the goal. Please try to explore solving the problem using the available tools.
+If no function can be used, please respond to the user directly using natural language.
+If the given problem lacks the parameters required by the function, please ask the user for the necessary information using natural language.
+If the call results are sufficient to answer the user's question, please summarize the historical results and respond to the user using natural language.
+Cite sources when relevant
 Be concise but thorough in your responses.`,
+//       systemPrompt: `You are a helpful assistant with access to a personal knowledge base.
+//
+// When asked a question:
+// 1. Use the search_knowledge_base tool to find relevant information
+// 2. Synthesize the information into a clear, helpful response
+// 3. Cite sources when relevant
+//
+// Be concise but thorough in your responses.`,
     });
 
     logger.info({ event: "shutdown_complete" });
