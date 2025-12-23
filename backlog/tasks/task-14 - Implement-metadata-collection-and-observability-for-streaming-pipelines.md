@@ -1,9 +1,10 @@
 ---
 id: task-14
 title: Implement metadata collection and observability for streaming pipelines
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-12-22 16:38'
+updated_date: '2025-12-23 03:56'
 labels:
   - streaming
   - observability
@@ -106,13 +107,13 @@ Build observability infrastructure for streaming pipelines that handles lazy exe
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 withMetadata generator wrapper implemented
-- [ ] #2 MetadataCollector tracks per-item and aggregate metrics
-- [ ] #3 Incremental percentile calculation using online algorithm
-- [ ] #4 StreamMetadata type extends existing StepMetadata
-- [ ] #5 Metadata snapshots available at any point during streaming
-- [ ] #6 Trace ID and span ID propagation preserved
-- [ ] #7 Performance overhead <5% in benchmarks
-- [ ] #8 Unit tests verify metric accuracy
-- [ ] #9 Integration with existing observability infrastructure
+- [x] #1 withMetadata generator wrapper implemented
+- [x] #2 MetadataCollector tracks per-item and aggregate metrics
+- [x] #3 Incremental percentile calculation using online algorithm
+- [x] #4 StreamMetadata type extends existing StepMetadata
+- [x] #5 Metadata snapshots available at any point during streaming
+- [x] #6 Trace ID and span ID propagation preserved
+- [x] #7 Performance overhead <5% in benchmarks
+- [x] #8 Unit tests verify metric accuracy
+- [x] #9 Integration with existing observability infrastructure
 <!-- AC:END -->

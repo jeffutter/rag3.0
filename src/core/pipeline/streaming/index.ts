@@ -28,6 +28,13 @@ export {
   tap,
   toArray,
 } from "./generators";
+// Export metadata and observability utilities
+export type {
+  LatencyStats,
+  StreamMetadata,
+  StreamOperationMetadata,
+} from "./metadata";
+export { MetadataCollector, withMetadata } from "./metadata";
 // Export parallel processing utilities
 export type { ParallelOptions } from "./parallel";
 export { merge, parallelFilter, parallelMap } from "./parallel";
