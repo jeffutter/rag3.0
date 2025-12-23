@@ -39,7 +39,8 @@
       "Bash(biome:*)",
       "Bash(wc:*)",
       "Bash(jj commit:*)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Bash(xargs ls:*)"
     ],
     "deny": [],
     "ask": []

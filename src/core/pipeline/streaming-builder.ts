@@ -34,18 +34,11 @@
  */
 
 import { createLogger } from "../logging/logger";
-import { StreamingStateImpl, arrayToGenerator, collectStream } from "./streaming-state";
-import type { StreamingStep, StreamingStepContext } from "./streaming-types";
-import type {
-  AddToState as AddToStreamingState,
-  StreamingPipeline as IStreamingPipeline,
-  StreamingStepFn,
-} from "./streaming/types";
 import {
+  fromArray,
   batch as genBatch,
   filter as genFilter,
   flatMap as genFlatMap,
-  fromArray,
   map as genMap,
   skip as genSkip,
   take as genTake,
@@ -53,7 +46,14 @@ import {
   toArray,
 } from "./streaming/generators";
 import { parallelMap } from "./streaming/parallel";
-import { window, bufferTime } from "./streaming/windowing";
+import type {
+  AddToState as AddToStreamingState,
+  StreamingPipeline as IStreamingPipeline,
+  StreamingStepFn,
+} from "./streaming/types";
+import { bufferTime, window } from "./streaming/windowing";
+import { arrayToGenerator, collectStream, StreamingStateImpl } from "./streaming-state";
+import type { StreamingStep, StreamingStepContext } from "./streaming-types";
 
 const logger = createLogger("streaming-pipeline");
 
@@ -180,7 +180,12 @@ export class StreamingPipeline<
     step: StreamingStep<TCurrentOutput, TNextOutput, TAccumulatedState, TContext>,
   ): TKey extends keyof TAccumulatedState
     ? never
-    : StreamingPipeline<TInitialInput, TNextOutput, AddToStreamingState<TAccumulatedState, TKey, TNextOutput>, TContext> {
+    : StreamingPipeline<
+        TInitialInput,
+        TNextOutput,
+        AddToStreamingState<TAccumulatedState, TKey, TNextOutput>,
+        TContext
+      > {
     // Capture contextBuilder in closure
     const contextBuilder = this.contextBuilder;
 
@@ -234,7 +239,9 @@ export class StreamingPipeline<
    */
   map<TKey extends string, TOutput>(
     key: TKey,
-    fn: ((item: TCurrentOutput, index: number) => TOutput | Promise<TOutput>) | StreamingStep<TCurrentOutput, TOutput, TAccumulatedState, TContext>,
+    fn:
+      | ((item: TCurrentOutput, index: number) => TOutput | Promise<TOutput>)
+      | StreamingStep<TCurrentOutput, TOutput, TAccumulatedState, TContext>,
     options?: MapOptions,
   ): TKey extends keyof TAccumulatedState
     ? never
@@ -245,10 +252,11 @@ export class StreamingPipeline<
       // It's a plain function
       if (options?.parallel) {
         // Use parallel map
-        transform = (input) => parallelMap(input, fn as (item: TCurrentOutput, index: number) => Promise<TOutput>, {
-          concurrency: options.concurrency ?? 10,
-          ordered: options.ordered ?? true,
-        });
+        transform = (input) =>
+          parallelMap(input, fn as (item: TCurrentOutput, index: number) => Promise<TOutput>, {
+            concurrency: options.concurrency ?? 10,
+            ordered: options.ordered ?? true,
+          });
       } else {
         // Use sequential map
         transform = (input) => genMap(input, fn);
@@ -300,7 +308,12 @@ export class StreamingPipeline<
     predicate: (item: TCurrentOutput, index: number) => boolean | Promise<boolean>,
   ): TKey extends keyof TAccumulatedState
     ? never
-    : StreamingPipeline<TInitialInput, TCurrentOutput, AddToStreamingState<TAccumulatedState, TKey, TCurrentOutput>, TContext> {
+    : StreamingPipeline<
+        TInitialInput,
+        TCurrentOutput,
+        AddToStreamingState<TAccumulatedState, TKey, TCurrentOutput>,
+        TContext
+      > {
     const transform = (input: AsyncGenerator<TCurrentOutput>) => genFilter(input, predicate);
 
     return new StreamingPipeline(
@@ -332,7 +345,10 @@ export class StreamingPipeline<
    */
   flatMap<TKey extends string, TOutput>(
     key: TKey,
-    fn: (item: TCurrentOutput, index: number) => AsyncIterable<TOutput> | Iterable<TOutput> | Promise<Iterable<TOutput>>,
+    fn: (
+      item: TCurrentOutput,
+      index: number,
+    ) => AsyncIterable<TOutput> | Iterable<TOutput> | Promise<Iterable<TOutput>>,
   ): TKey extends keyof TAccumulatedState
     ? never
     : StreamingPipeline<TInitialInput, TOutput, AddToStreamingState<TAccumulatedState, TKey, TOutput>, TContext> {
@@ -366,7 +382,12 @@ export class StreamingPipeline<
     fn: (item: TCurrentOutput, index: number) => void | Promise<void>,
   ): TKey extends keyof TAccumulatedState
     ? never
-    : StreamingPipeline<TInitialInput, TCurrentOutput, AddToStreamingState<TAccumulatedState, TKey, TCurrentOutput>, TContext> {
+    : StreamingPipeline<
+        TInitialInput,
+        TCurrentOutput,
+        AddToStreamingState<TAccumulatedState, TKey, TCurrentOutput>,
+        TContext
+      > {
     const transform = (input: AsyncGenerator<TCurrentOutput>) => genTap(input, fn);
 
     return new StreamingPipeline(
@@ -396,7 +417,12 @@ export class StreamingPipeline<
     size: number,
   ): TKey extends keyof TAccumulatedState
     ? never
-    : StreamingPipeline<TInitialInput, TCurrentOutput[], AddToStreamingState<TAccumulatedState, TKey, TCurrentOutput[]>, TContext> {
+    : StreamingPipeline<
+        TInitialInput,
+        TCurrentOutput[],
+        AddToStreamingState<TAccumulatedState, TKey, TCurrentOutput[]>,
+        TContext
+      > {
     const transform = (input: AsyncGenerator<TCurrentOutput>) => genBatch(input, size);
 
     return new StreamingPipeline(
@@ -432,7 +458,12 @@ export class StreamingPipeline<
     slideSize?: number,
   ): TKey extends keyof TAccumulatedState
     ? never
-    : StreamingPipeline<TInitialInput, TCurrentOutput[], AddToStreamingState<TAccumulatedState, TKey, TCurrentOutput[]>, TContext> {
+    : StreamingPipeline<
+        TInitialInput,
+        TCurrentOutput[],
+        AddToStreamingState<TAccumulatedState, TKey, TCurrentOutput[]>,
+        TContext
+      > {
     const transform = (input: AsyncGenerator<TCurrentOutput>) => window(input, windowSize, slideSize);
 
     return new StreamingPipeline(
@@ -468,7 +499,12 @@ export class StreamingPipeline<
     maxSize?: number,
   ): TKey extends keyof TAccumulatedState
     ? never
-    : StreamingPipeline<TInitialInput, TCurrentOutput[], AddToStreamingState<TAccumulatedState, TKey, TCurrentOutput[]>, TContext> {
+    : StreamingPipeline<
+        TInitialInput,
+        TCurrentOutput[],
+        AddToStreamingState<TAccumulatedState, TKey, TCurrentOutput[]>,
+        TContext
+      > {
     const transform = (input: AsyncGenerator<TCurrentOutput>) => bufferTime(input, windowMs, maxSize);
 
     return new StreamingPipeline(
@@ -498,7 +534,12 @@ export class StreamingPipeline<
     count: number,
   ): TKey extends keyof TAccumulatedState
     ? never
-    : StreamingPipeline<TInitialInput, TCurrentOutput, AddToStreamingState<TAccumulatedState, TKey, TCurrentOutput>, TContext> {
+    : StreamingPipeline<
+        TInitialInput,
+        TCurrentOutput,
+        AddToStreamingState<TAccumulatedState, TKey, TCurrentOutput>,
+        TContext
+      > {
     const transform = (input: AsyncGenerator<TCurrentOutput>) => genTake(input, count);
 
     return new StreamingPipeline(
@@ -528,7 +569,12 @@ export class StreamingPipeline<
     count: number,
   ): TKey extends keyof TAccumulatedState
     ? never
-    : StreamingPipeline<TInitialInput, TCurrentOutput, AddToStreamingState<TAccumulatedState, TKey, TCurrentOutput>, TContext> {
+    : StreamingPipeline<
+        TInitialInput,
+        TCurrentOutput,
+        AddToStreamingState<TAccumulatedState, TKey, TCurrentOutput>,
+        TContext
+      > {
     const transform = (input: AsyncGenerator<TCurrentOutput>) => genSkip(input, count);
 
     return new StreamingPipeline(
@@ -558,7 +604,12 @@ export class StreamingPipeline<
     predicate: (item: TCurrentOutput, index: number) => boolean | Promise<boolean>,
   ): TKey extends keyof TAccumulatedState
     ? never
-    : StreamingPipeline<TInitialInput, TCurrentOutput, AddToStreamingState<TAccumulatedState, TKey, TCurrentOutput>, TContext> {
+    : StreamingPipeline<
+        TInitialInput,
+        TCurrentOutput,
+        AddToStreamingState<TAccumulatedState, TKey, TCurrentOutput>,
+        TContext
+      > {
     const transform = async function* (input: AsyncGenerator<TCurrentOutput>): AsyncGenerator<TCurrentOutput> {
       let index = 0;
       try {
@@ -602,7 +653,12 @@ export class StreamingPipeline<
     predicate: (item: TCurrentOutput, index: number) => boolean | Promise<boolean>,
   ): TKey extends keyof TAccumulatedState
     ? never
-    : StreamingPipeline<TInitialInput, TCurrentOutput, AddToStreamingState<TAccumulatedState, TKey, TCurrentOutput>, TContext> {
+    : StreamingPipeline<
+        TInitialInput,
+        TCurrentOutput,
+        AddToStreamingState<TAccumulatedState, TKey, TCurrentOutput>,
+        TContext
+      > {
     const transform = async function* (input: AsyncGenerator<TCurrentOutput>): AsyncGenerator<TCurrentOutput> {
       let index = 0;
       let skipping = true;
