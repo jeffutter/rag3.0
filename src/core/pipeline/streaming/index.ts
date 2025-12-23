@@ -11,6 +11,9 @@
 // Export composition utilities
 export type { GeneratorFn } from "./compose";
 export { compose, identity, lift, liftFilter, liftFlatMap, pipe } from "./compose";
+// Export error handling and retry utilities
+export type { RetryMetadata, RetryOptions, StreamResultWithRetry } from "./errors";
+export { ErrorStrategy, isRetryableError, mapWithRetry, withErrorStrategy, withRetry } from "./errors";
 // Export generator utilities
 export {
   batch,
