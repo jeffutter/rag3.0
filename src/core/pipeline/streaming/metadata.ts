@@ -512,10 +512,10 @@ class TDigest {
  */
 export async function* withMetadata<T>(
   source: AsyncIterable<T>,
-  stepName: string,
+  _stepName: string,
   collector: MetadataCollector,
-  traceId?: string,
-  spanId?: string,
+  _traceId?: string,
+  _spanId?: string,
 ): AsyncGenerator<T> {
   let index = 0;
 
@@ -525,9 +525,9 @@ export async function* withMetadata<T>(
       collector.recordItemStart(index);
 
       // Yield the item unchanged
-      const startYield = Date.now();
+      const _startYield = Date.now();
       yield item;
-      const endYield = Date.now();
+      const _endYield = Date.now();
 
       // Record successful processing
       // Note: We measure the time the consumer takes to request the next item
