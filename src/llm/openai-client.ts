@@ -85,6 +85,11 @@ export class OpenAICompatibleClient implements LLMClient {
 
     const response = await this.client.chat.completions.create(createParams);
 
+    logger.debug({
+      event: "completion_response",
+      response: response,
+    });
+
     const choice = response.choices[0];
     if (!choice) {
       throw new Error("No completion choices returned");

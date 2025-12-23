@@ -1,9 +1,10 @@
 ---
 id: task-17
 title: Create comprehensive streaming pipeline examples and documentation
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-12-22 16:38'
+updated_date: '2025-12-23 20:28'
 labels:
   - streaming
   - documentation
@@ -113,13 +114,13 @@ Build example pipelines and documentation showing how to use streaming pipelines
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Six comprehensive example files covering all streaming features
-- [ ] #2 Examples demonstrate lazy evaluation, parallel processing, error handling
-- [ ] #3 Real-world RAG pipeline example with metrics
-- [ ] #4 Complete API reference documentation
-- [ ] #5 Migration guide from batch to streaming pipelines
-- [ ] #6 Patterns and best practices documented
-- [ ] #7 Comparison table highlighting differences
-- [ ] #8 All examples tested and working
-- [ ] #9 Documentation reviewed for clarity and completeness
+- [x] #1 Six comprehensive example files covering all streaming features
+- [x] #2 Examples demonstrate lazy evaluation, parallel processing, error handling
+- [x] #3 Real-world RAG pipeline example with metrics
+- [x] #4 Complete API reference documentation
+- [x] #5 Migration guide from batch to streaming pipelines
+- [x] #6 Patterns and best practices documented
+- [x] #7 Comparison table highlighting differences
+- [x] #8 All examples tested and working
+- [x] #9 Documentation reviewed for clarity and completeness
 <!-- AC:END -->
