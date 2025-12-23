@@ -40,7 +40,8 @@
       "Bash(wc:*)",
       "Bash(jj commit:*)",
       "Bash(test:*)",
-      "Bash(xargs ls:*)"
+      "Bash(xargs ls:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []
