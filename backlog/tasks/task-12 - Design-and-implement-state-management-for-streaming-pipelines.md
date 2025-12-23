@@ -1,9 +1,10 @@
 ---
 id: task-12
 title: Design and implement state management for streaming pipelines
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-12-22 16:37'
+updated_date: '2025-12-23 03:40'
 labels:
   - streaming
   - state-management
@@ -82,11 +83,52 @@ Start with approach #4 (State Reduction Points) because:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 State management approach selected and documented
-- [ ] #2 API designed for accessing accumulated state in streaming context
-- [ ] #3 Type safety preserved for state access
-- [ ] #4 Handles both per-item and aggregated state scenarios
-- [ ] #5 Clear semantics for when state is available
-- [ ] #6 Migration path from current batch pipeline state model
-- [ ] #7 Examples demonstrating state access patterns
+- [x] #1 State management approach selected and documented
+- [x] #2 API designed for accessing accumulated state in streaming context
+- [x] #3 Type safety preserved for state access
+- [x] #4 Handles both per-item and aggregated state scenarios
+- [x] #5 Clear semantics for when state is available
+- [x] #6 Migration path from current batch pipeline state model
+- [x] #7 Examples demonstrating state access patterns
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+## Implementation Summary
+
+Implemented hybrid state management for streaming pipelines following the design document's recommendation (Approach #4: State Reduction Points / Checkpoints).
+
+### Files Created
+
+1. **`src/core/pipeline/streaming-types.ts`** - Core type definitions
+2. **`src/core/pipeline/streaming-state.ts`** - State management implementation  
+3. **`src/core/pipeline/streaming-steps.ts`** - Step creation helpers
+4. **`src/core/pipeline/streaming-state.test.ts`** - Comprehensive tests (27 tests passing)
+5. **`src/core/pipeline/streaming-examples.ts`** - Four complete usage examples
+
+### Key Features
+
+**StreamingState Interface:**
+- `accumulated`: Snapshot access (checkpointed state)
+- `stream(key)`: Streaming access to previous outputs
+- `materialize(key)`: Force materialization on demand
+
+**State Access Patterns:**
+- Snapshot: Fast lookup, checkpointed data
+- Streaming: Memory-efficient, lazy evaluation
+- Lazy materialization: Defer cost until needed
+
+**Memory Characteristics:**
+- Checkpoints: O(n) for materialized data
+- Streaming: O(1) for items in flight
+- Materialization: Converts O(1) → O(n) on demand
+
+### Testing
+
+All 27 tests pass with full type safety.
+
+### Ready For
+
+StreamingPipeline builder integration (task-13)
+<!-- SECTION:NOTES:END -->
