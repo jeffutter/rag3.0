@@ -1,4 +1,5 @@
 import { createStep } from "../../core/pipeline/steps";
+import type { ObsidianVaultUtilityClient } from "../../lib/obsidian-vault-utility-client";
 import type { OpenAICompatibleClient } from "../../llm/openai-client";
 import type { CompletionResponse } from "../../llm/types";
 import type { VectorSearchClient } from "../../retrieval/qdrant-client";
@@ -18,6 +19,7 @@ interface LLMWithRAGInput {
 interface LLMWithRAGContext {
   llmClient: OpenAICompatibleClient;
   vectorClient: VectorSearchClient;
+  vaultClient: ObsidianVaultUtilityClient;
   model: string;
   embeddingConfig: {
     baseURL: string;
@@ -49,10 +51,11 @@ export const llmWithRAGStep = createStep<
   {},
   LLMWithRAGContext
 >("llm_with_rag", async ({ input, context }) => {
-  const ragTool = createRAGSearchTool({
+  const ragTool = await createRAGSearchTool({
     vectorClient: context.vectorClient,
     embeddingConfig: context.embeddingConfig,
     defaultCollection: context.defaultCollection,
+    vaultClient: context.vaultClient,
   });
 
   const systemPrompt =

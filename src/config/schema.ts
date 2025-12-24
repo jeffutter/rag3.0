@@ -27,6 +27,10 @@ export const configSchema = z.object({
     defaultCollection: z.string().default("rag_store"),
   }),
 
+  vault: z.object({
+    baseURL: z.string(),
+  }),
+
   logging: z
     .object({
       level: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
@@ -38,52 +42,112 @@ export const configSchema = z.object({
 export type Config = z.infer<typeof configSchema>;
 
 /**
- * Load configuration from file or environment variables.
+ * Load configuration from file and environment variables.
  *
- * Priority:
- * 1. Config file specified by path parameter
- * 2. Config file at CONFIG_FILE env var
- * 3. ./config.json
- * 4. Environment variables fallback
+ * Priority (higher overrides lower):
+ * 1. Environment variables (highest priority - always override)
+ * 2. Config file specified by path parameter
+ * 3. Config file at CONFIG_FILE env var
+ * 4. ./config.json
+ * 5. Schema defaults (lowest priority)
  */
 export async function loadConfig(path?: string): Promise<Config> {
   const configPath = path || process.env.CONFIG_FILE || "./config.json";
 
+  // Load base config from file if it exists
+  let fileConfig: unknown = {};
   try {
     const file = Bun.file(configPath);
     const exists = await file.exists();
 
     if (exists) {
-      const raw = await file.json();
-      return configSchema.parse(raw);
+      fileConfig = await file.json();
     }
   } catch (_error) {
-    // File doesn't exist or is invalid, fall through to env vars
+    // File doesn't exist or is invalid, use empty object
+    fileConfig = {};
   }
 
-  // Try environment variables as fallback
+  // Build env config object (only including values that are actually set)
+  const envConfig: Record<string, unknown> = {};
+
+  // Server overrides
+  if (process.env.SERVER_PORT || process.env.SERVER_HOST) {
+    envConfig.server = {
+      ...(typeof fileConfig === "object" && fileConfig !== null && "server" in fileConfig
+        ? (fileConfig.server as Record<string, unknown>)
+        : {}),
+      ...(process.env.SERVER_PORT ? { port: Number.parseInt(process.env.SERVER_PORT, 10) } : {}),
+      ...(process.env.SERVER_HOST ? { host: process.env.SERVER_HOST } : {}),
+    };
+  }
+
+  // LLM overrides
+  if (process.env.LLM_BASE_URL || process.env.LLM_API_KEY || process.env.LLM_MODEL || process.env.LLM_TIMEOUT) {
+    envConfig.llm = {
+      ...(typeof fileConfig === "object" && fileConfig !== null && "llm" in fileConfig
+        ? (fileConfig.llm as Record<string, unknown>)
+        : {}),
+      ...(process.env.LLM_BASE_URL ? { baseURL: process.env.LLM_BASE_URL } : {}),
+      ...(process.env.LLM_API_KEY ? { apiKey: process.env.LLM_API_KEY } : {}),
+      ...(process.env.LLM_MODEL ? { model: process.env.LLM_MODEL } : {}),
+      ...(process.env.LLM_TIMEOUT ? { timeout: Number.parseInt(process.env.LLM_TIMEOUT, 10) } : {}),
+    };
+  }
+
+  // Embedding overrides
+  if (process.env.EMBEDDING_BASE_URL || process.env.EMBEDDING_MODEL || process.env.EMBEDDING_API_KEY) {
+    envConfig.embedding = {
+      ...(typeof fileConfig === "object" && fileConfig !== null && "embedding" in fileConfig
+        ? (fileConfig.embedding as Record<string, unknown>)
+        : {}),
+      ...(process.env.EMBEDDING_BASE_URL ? { baseURL: process.env.EMBEDDING_BASE_URL } : {}),
+      ...(process.env.EMBEDDING_MODEL ? { model: process.env.EMBEDDING_MODEL } : {}),
+      ...(process.env.EMBEDDING_API_KEY ? { apiKey: process.env.EMBEDDING_API_KEY } : {}),
+    };
+  }
+
+  // Qdrant overrides
+  if (process.env.QDRANT_URL || process.env.QDRANT_API_KEY || process.env.QDRANT_COLLECTION) {
+    envConfig.qdrant = {
+      ...(typeof fileConfig === "object" && fileConfig !== null && "qdrant" in fileConfig
+        ? (fileConfig.qdrant as Record<string, unknown>)
+        : {}),
+      ...(process.env.QDRANT_URL ? { url: process.env.QDRANT_URL } : {}),
+      ...(process.env.QDRANT_API_KEY ? { apiKey: process.env.QDRANT_API_KEY } : {}),
+      ...(process.env.QDRANT_COLLECTION ? { defaultCollection: process.env.QDRANT_COLLECTION } : {}),
+    };
+  }
+
+  // Vault overrides
+  if (process.env.VAULT_BASE_URL) {
+    envConfig.vault = {
+      ...(typeof fileConfig === "object" && fileConfig !== null && "vault" in fileConfig
+        ? (fileConfig.vault as Record<string, unknown>)
+        : {}),
+      baseURL: process.env.VAULT_BASE_URL,
+    };
+  }
+
+  // Logging overrides
+  if (process.env.LOG_LEVEL || process.env.NODE_ENV) {
+    envConfig.logging = {
+      ...(typeof fileConfig === "object" && fileConfig !== null && "logging" in fileConfig
+        ? (fileConfig.logging as Record<string, unknown>)
+        : {}),
+      ...(process.env.LOG_LEVEL ? { level: process.env.LOG_LEVEL } : {}),
+      ...(process.env.NODE_ENV ? { pretty: process.env.NODE_ENV !== "production" } : {}),
+    };
+  }
+
+  // Merge file config with env config (env config takes precedence)
+  const mergedConfig = {
+    ...(typeof fileConfig === "object" && fileConfig !== null ? fileConfig : {}),
+    ...envConfig,
+  };
+
   try {
-    return configSchema.parse({
-      llm: {
-        baseURL: process.env.LLM_BASE_URL,
-        apiKey: process.env.LLM_API_KEY,
-        model: process.env.LLM_MODEL,
-      },
-      embedding: {
-        baseURL: process.env.EMBEDDING_BASE_URL || process.env.LLM_BASE_URL,
-        model: process.env.EMBEDDING_MODEL,
-        apiKey: process.env.EMBEDDING_API_KEY || process.env.LLM_API_KEY,
-      },
-      qdrant: {
-        url: process.env.QDRANT_URL,
-        apiKey: process.env.QDRANT_API_KEY,
-        defaultCollection: process.env.QDRANT_COLLECTION,
-      },
-      logging: {
-        level: (process.env.LOG_LEVEL as "trace" | "debug" | "info" | "warn" | "error" | "fatal" | undefined) || "info",
-        pretty: process.env.NODE_ENV !== "production",
-      },
-    });
+    return configSchema.parse(mergedConfig);
   } catch (error) {
     throw new Error(`Failed to load configuration: ${error instanceof Error ? error.message : String(error)}`);
   }

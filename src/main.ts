@@ -1,6 +1,7 @@
 import { loadConfig } from "./config/schema";
 import { createLogger } from "./core/logging/logger";
 import { runCLI } from "./io/cli";
+import { createObsidianVaultUtilityClient } from "./lib/obsidian-vault-utility-client";
 import { OpenAICompatibleClient } from "./llm/openai-client";
 import { VectorSearchClient } from "./retrieval/qdrant-client";
 import { createRAGSearchTool } from "./tools/rag-search";
@@ -68,13 +69,19 @@ async function main() {
       embeddingConfig.apiKey = config.embedding.apiKey;
     }
 
+    // Initialize Obsidian Vault Utility client
+    const vaultClient = createObsidianVaultUtilityClient({
+      baseURL: config.vault.baseURL,
+    });
+
     // Register tools
     const toolRegistry = new ToolRegistry();
 
-    const ragSearchTool = createRAGSearchTool({
+    const ragSearchTool = await createRAGSearchTool({
       vectorClient,
       embeddingConfig,
       defaultCollection: config.qdrant.defaultCollection,
+      vaultClient,
     });
 
     toolRegistry.register(ragSearchTool);

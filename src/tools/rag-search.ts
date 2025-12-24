@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createLogger } from "../core/logging/logger";
+import type { ObsidianVaultUtilityClient } from "../lib/obsidian-vault-utility-client";
 import type { EmbeddingConfig } from "../retrieval/embedding";
 import type { SearchResult, VectorSearchClient } from "../retrieval/qdrant-client";
 import { defineTool } from "./registry";
@@ -10,25 +11,45 @@ export interface RAGSearchContext {
   vectorClient: VectorSearchClient;
   embeddingConfig: EmbeddingConfig;
   defaultCollection: string;
+  vaultClient: ObsidianVaultUtilityClient;
 }
 
 const LIMIT = 20;
 
-const searchArgsSchema = z.object({
-  query: z.string().describe("The search query to find relevant documents"),
-  limit: z
-    .number()
-    .min(1)
-    .max(20)
-    .optional()
-    .default(5)
-    .describe(`Maximum number of results to return. Must be ${LIMIT} or less`),
-  tags: z.array(z.string()).optional().describe("Filter results by tags"),
-});
+/**
+ * Creates a search arguments schema with dynamically loaded tags
+ */
+function createSearchArgsSchema(availableTags: string[]) {
+  // Filter out empty tags and format for display
+  const tagList = availableTags.filter((tag) => tag.trim().length > 0).join(", ");
 
-type SearchArgs = z.infer<typeof searchArgsSchema>;
+  return z.object({
+    query: z.string().describe("The search query to find relevant documents"),
+    limit: z
+      .number()
+      .min(1)
+      .max(20)
+      .optional()
+      .default(5)
+      .describe(`Maximum number of results to return. Must be ${LIMIT} or less`),
+    tags: z
+      .array(z.string())
+      .optional()
+      .describe(
+        `Filter results by tags. Choose relevant tags from this list if applicable: ${tagList}. Multiple tags can be provided to broaden the search.`,
+      ),
+  });
+}
 
-export function createRAGSearchTool(context: RAGSearchContext) {
+type SearchArgs = z.infer<ReturnType<typeof createSearchArgsSchema>>;
+
+export async function createRAGSearchTool(context: RAGSearchContext) {
+  // Fetch available tags dynamically
+  logger.info({ event: "fetching_available_tags" });
+  const availableTags = await context.vaultClient.getTags();
+  logger.info({ event: "tags_loaded", count: availableTags.length });
+
+  const searchArgsSchema = createSearchArgsSchema(availableTags);
   return defineTool({
     name: "search_knowledge_base",
     description:

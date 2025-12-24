@@ -9,6 +9,7 @@
 
 import { Pipeline } from "./core/pipeline/builder";
 import { createStep } from "./core/pipeline/steps";
+import { createObsidianVaultUtilityClient } from "./lib/obsidian-vault-utility-client";
 import { OpenAICompatibleClient } from "./llm/openai-client";
 import type { CompletionResponse, ToolDefinition } from "./llm/types";
 import { VectorSearchClient } from "./retrieval/qdrant-client";
@@ -28,6 +29,9 @@ const EMBEDDING_API_KEY = process.env.EMBEDDING_API_KEY || process.env.LLM_API_K
 const QDRANT_URL = process.env.QDRANT_URL || "http://localhost:6333";
 const QDRANT_API_KEY = process.env.QDRANT_API_KEY;
 const QDRANT_COLLECTION = process.env.QDRANT_COLLECTION || "rag_store";
+
+// Vault Configuration
+const VAULT_BASE_URL = process.env.VAULT_BASE_URL || "http://localhost:5680";
 
 // Step 1: CLI Input - just validates and passes through the input
 const cliInputStep = createStep<string, string>("cli_input", async ({ input }) => {
@@ -181,10 +185,15 @@ Note: The LLM will automatically decide whether to use the RAG search tool based
     embeddingConfig.apiKey = EMBEDDING_API_KEY;
   }
 
-  const ragTool = createRAGSearchTool({
+  const vaultClient = createObsidianVaultUtilityClient({
+    baseURL: VAULT_BASE_URL,
+  });
+
+  const ragTool = await createRAGSearchTool({
     vectorClient,
     embeddingConfig,
     defaultCollection: QDRANT_COLLECTION,
+    vaultClient,
   });
 
   // biome-ignore lint/suspicious/noExplicitAny: Tools can have various argument types

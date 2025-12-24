@@ -3,6 +3,7 @@ import { createLogger } from "./core/logging/logger";
 import { PipelineRegistry } from "./core/pipeline/registry";
 import { runMCPServer } from "./io/mcp-server";
 import { runWebhookServer } from "./io/webhook-server";
+import { createObsidianVaultUtilityClient } from "./lib/obsidian-vault-utility-client";
 import { OpenAICompatibleClient } from "./llm/openai-client";
 import { VectorSearchClient } from "./retrieval/qdrant-client";
 import { createRAGQueryRegistration } from "./workflows/rag-query";
@@ -91,6 +92,11 @@ async function main() {
       embeddingConfig.apiKey = config.embedding.apiKey;
     }
 
+    // Initialize Obsidian Vault Utility client
+    const vaultClient = createObsidianVaultUtilityClient({
+      baseURL: config.vault.baseURL,
+    });
+
     // Create pipeline registry
     const pipelineRegistry = new PipelineRegistry();
 
@@ -98,6 +104,7 @@ async function main() {
     const ragQueryPipeline = createRAGQueryRegistration({
       llmClient,
       vectorClient,
+      vaultClient,
       model: config.llm.model,
       embeddingConfig,
       defaultCollection: config.qdrant.defaultCollection,
