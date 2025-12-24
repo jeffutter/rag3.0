@@ -1,7 +1,7 @@
 import { createStep } from "../../core/pipeline/steps";
 import type { ChunkWithEmbedding } from "../ai/generate-embeddings-for-batch";
-import type { ChunkData } from "./split-markdown-for-embed";
 import type { FileEntry } from "./extract-files";
+import type { ChunkData } from "./split-markdown-for-embed";
 
 /**
  * Schema for embedded document chunks.

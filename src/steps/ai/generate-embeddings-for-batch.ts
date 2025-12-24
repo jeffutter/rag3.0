@@ -1,7 +1,7 @@
 import { createStep } from "../../core/pipeline/steps";
 import { generateEmbeddings } from "../../lib/embeddings";
-import type { ChunkData } from "../utilities/split-markdown-for-embed";
 import type { FileEntry } from "../utilities/extract-files";
+import type { ChunkData } from "../utilities/split-markdown-for-embed";
 
 /**
  * Interface for chunk with embedding attached.

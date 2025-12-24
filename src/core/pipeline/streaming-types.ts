@@ -25,7 +25,10 @@ import type { StepMetadata } from "./types";
  *
  * @template TAccumulated - Object containing all previous step outputs by name
  */
-export interface StreamingState<TAccumulated extends Record<string, any>> {
+export interface StreamingState<
+  // biome-ignore lint/suspicious/noExplicitAny: Generic constraint requires any to allow flexible accumulated state types
+  TAccumulated extends Record<string, any>,
+> {
   /**
    * Access snapshot state (lazy-loaded from checkpoints).
    * Only available for steps that have been checkpointed.
@@ -66,7 +69,12 @@ export interface StreamingState<TAccumulated extends Record<string, any>> {
  * @template TAccumulated - Accumulated state from previous steps
  * @template TContext - Runtime context
  */
-export interface StreamingStepContext<TInput, TAccumulated extends Record<string, any>, TContext = unknown> {
+export interface StreamingStepContext<
+  TInput,
+  // biome-ignore lint/suspicious/noExplicitAny: Generic constraint requires any to allow flexible accumulated state types
+  TAccumulated extends Record<string, any>,
+  TContext = unknown,
+> {
   /**
    * Input stream from previous step.
    * Iterate over this to process items.
@@ -115,6 +123,7 @@ export interface StreamingStepResult<T> {
 export interface StreamingStep<
   TInput,
   TOutput,
+  // biome-ignore lint/suspicious/noExplicitAny: Generic constraint requires any to allow flexible accumulated state types
   TAccumulated extends Record<string, any> = Record<string, never>,
   TContext = unknown,
 > {
@@ -212,17 +221,23 @@ export interface StreamingMetadata extends StepMetadata {
 /**
  * Extract input type from a streaming step.
  */
-export type StreamingStepInput<S> = S extends StreamingStep<infer I, any, any, any> ? I : never;
+export type StreamingStepInput<S> =
+  // biome-ignore lint/suspicious/noExplicitAny: Using any in conditional type to match any type parameter
+  S extends StreamingStep<infer I, any, any, any> ? I : never;
 
 /**
  * Extract output type from a streaming step.
  */
-export type StreamingStepOutput<S> = S extends StreamingStep<any, infer O, any, any> ? O : never;
+export type StreamingStepOutput<S> =
+  // biome-ignore lint/suspicious/noExplicitAny: Using any in conditional type to match any type parameter
+  S extends StreamingStep<any, infer O, any, any> ? O : never;
 
 /**
  * Extract accumulated state type from a streaming step.
  */
-export type StreamingStepAccumulated<S> = S extends StreamingStep<any, any, infer A, any> ? A : never;
+export type StreamingStepAccumulated<S> =
+  // biome-ignore lint/suspicious/noExplicitAny: Using any in conditional type to match any type parameter
+  S extends StreamingStep<any, any, infer A, any> ? A : never;
 
 /**
  * Helper to merge accumulated state with a new step's output.

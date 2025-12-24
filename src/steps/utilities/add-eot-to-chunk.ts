@@ -1,7 +1,7 @@
 import { createStep } from "../../core/pipeline/steps";
 import { addEOT } from "../../lib/text-processing";
-import type { ChunkData } from "./split-markdown-for-embed";
 import type { FileEntry } from "./extract-files";
+import type { ChunkData } from "./split-markdown-for-embed";
 
 /**
  * Create an Add EOT To Chunk step for pipeline.

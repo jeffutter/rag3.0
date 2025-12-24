@@ -35,8 +35,9 @@ export class OpenAICompatibleClient implements LLMClient {
       // Use Zod v4's native JSON Schema conversion with OpenAPI 3.0 target
       // biome-ignore lint/suspicious/noExplicitAny: Zod's ZodType needs casting for toJSONSchema
       const jsonSchema = z.toJSONSchema(tool.parameters as any, {
-        target: "openapi-3.0",
-        unrepresentable: "any", // Handle unsupported types gracefully
+        // target: "openapi-3.0",
+        target: "draft-2020-12",
+        // unrepresentable: "any", // Handle unsupported types gracefully
       }) as Record<string, unknown>;
 
       logger.debug({

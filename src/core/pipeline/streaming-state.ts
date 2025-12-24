@@ -16,9 +16,11 @@ import type { StreamingState } from "./streaming-types";
  */
 interface StateStorage {
   /** Snapshots stored at checkpoints (materialized arrays) */
+  // biome-ignore lint/suspicious/noExplicitAny: Storage requires any[] to hold arrays of any type from different steps
   snapshots: Record<string, any[]>;
 
   /** Active generators for non-checkpointed steps */
+  // biome-ignore lint/suspicious/noExplicitAny: Generators can yield any type from different steps
   generators: Record<string, AsyncGenerator<any>>;
 }
 
@@ -30,10 +32,15 @@ interface StateStorage {
  * 2. Non-checkpointed steps: Access via generators (memory-efficient)
  * 3. Lazy materialization: Convert generators to arrays on demand
  */
-export class StreamingStateImpl<TAccumulated extends Record<string, any>> implements StreamingState<TAccumulated> {
+export class StreamingStateImpl<
+  // biome-ignore lint/suspicious/noExplicitAny: Generic constraint requires any to allow flexible accumulated state types
+  TAccumulated extends Record<string, any>,
+> implements StreamingState<TAccumulated>
+{
   private storage: StateStorage;
   private accumulatedCache: TAccumulated | null = null;
 
+  // biome-ignore lint/suspicious/noExplicitAny: Constructor parameters match StateStorage type requirements
   constructor(snapshots: Record<string, any[]> = {}, generators: Record<string, AsyncGenerator<any>> = {}) {
     this.storage = { snapshots, generators };
   }

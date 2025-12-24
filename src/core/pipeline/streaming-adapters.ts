@@ -14,8 +14,8 @@
  * @see {@link https://github.com/jeffutter/rag3.0/blob/main/docs/architecture/streaming-pipeline-design.md}
  */
 
-import type { Step, StepExecutionContext } from "./types";
 import type { StreamingStep, StreamingStepContext } from "./streaming-types";
+import type { Step, StepExecutionContext } from "./types";
 
 /**
  * Convert a batch step to a streaming step.
@@ -70,36 +70,37 @@ import type { StreamingStep, StreamingStepContext } from "./streaming-types";
  * ```
  */
 export function toStreamingStep<
-	TInput,
-	TOutput,
-	TAccumulated extends Record<string, any> = Record<string, never>,
-	TContext = unknown,
+  TInput,
+  TOutput,
+  // biome-ignore lint/suspicious/noExplicitAny: Generic constraint requires any to allow flexible accumulated state types
+  TAccumulated extends Record<string, any> = Record<string, never>,
+  TContext = unknown,
 >(step: Step<TInput, TOutput, TAccumulated, TContext>): StreamingStep<TInput, TOutput, TAccumulated, TContext> {
-	return {
-		name: `${step.name}_streaming`,
-		execute: async function* (ctx: StreamingStepContext<TInput, TAccumulated, TContext>) {
-			// Process each item from the input stream
-			for await (const item of ctx.input) {
-				// Convert streaming state to batch-compatible state
-				const batchContext: StepExecutionContext<TInput, TAccumulated, TContext> = {
-					input: item,
-					state: ctx.state.accumulated,
-					context: ctx.context,
-				};
+  return {
+    name: `${step.name}_streaming`,
+    execute: async function* (ctx: StreamingStepContext<TInput, TAccumulated, TContext>) {
+      // Process each item from the input stream
+      for await (const item of ctx.input) {
+        // Convert streaming state to batch-compatible state
+        const batchContext: StepExecutionContext<TInput, TAccumulated, TContext> = {
+          input: item,
+          state: ctx.state.accumulated,
+          context: ctx.context,
+        };
 
-				// Execute the batch step
-				const result = await step.execute(batchContext);
+        // Execute the batch step
+        const result = await step.execute(batchContext);
 
-				if (result.success) {
-					yield result.data;
-				} else {
-					// Propagate error
-					throw new Error(`Step ${step.name} failed: ${result.error.message}`);
-				}
-			}
-		},
-		...(step.retry && { retry: step.retry }),
-	};
+        if (result.success) {
+          yield result.data;
+        } else {
+          // Propagate error
+          throw new Error(`Step ${step.name} failed: ${result.error.message}`);
+        }
+      }
+    },
+    ...(step.retry && { retry: step.retry }),
+  };
 }
 
 /**
@@ -140,90 +141,91 @@ export function toStreamingStep<
  * ```
  */
 export function toBatchStep<
-	TInput,
-	TOutput,
-	TAccumulated extends Record<string, any> = Record<string, never>,
-	TContext = unknown,
+  TInput,
+  TOutput,
+  // biome-ignore lint/suspicious/noExplicitAny: Generic constraint requires any to allow flexible accumulated state types
+  TAccumulated extends Record<string, any> = Record<string, never>,
+  TContext = unknown,
 >(
-	streamingStep: StreamingStep<TInput, TOutput, TAccumulated, TContext>,
+  streamingStep: StreamingStep<TInput, TOutput, TAccumulated, TContext>,
 ): Step<TInput[], TOutput[], TAccumulated, TContext> {
-	return {
-		name: `${streamingStep.name}_batch`,
-		execute: async (ctx: StepExecutionContext<TInput[], TAccumulated, TContext>) => {
-			try {
-				const startTime = Date.now();
+  return {
+    name: `${streamingStep.name}_batch`,
+    execute: async (ctx: StepExecutionContext<TInput[], TAccumulated, TContext>) => {
+      try {
+        const startTime = Date.now();
 
-				// Create an async generator from the input array
-				async function* inputGenerator() {
-					for (const item of ctx.input) {
-						yield item;
-					}
-				}
+        // Create an async generator from the input array
+        async function* inputGenerator() {
+          for (const item of ctx.input) {
+            yield item;
+          }
+        }
 
-				// Create streaming state wrapper
-				const streamingState = {
-					accumulated: ctx.state,
-					stream: <K extends keyof TAccumulated>(_key: K): AsyncGenerator<TAccumulated[K]> => {
-						throw new Error("Stream access not supported in batch mode");
-					},
-					materialize: async <K extends keyof TAccumulated>(_key: K): Promise<Array<TAccumulated[K]>> => {
-						throw new Error("Materialize not supported in batch mode");
-					},
-					hasSnapshot: (_key: keyof TAccumulated): boolean => {
-						return true; // In batch mode, all state is available
-					},
-				};
+        // Create streaming state wrapper
+        const streamingState = {
+          accumulated: ctx.state,
+          stream: <K extends keyof TAccumulated>(_key: K): AsyncGenerator<TAccumulated[K]> => {
+            throw new Error("Stream access not supported in batch mode");
+          },
+          materialize: async <K extends keyof TAccumulated>(_key: K): Promise<Array<TAccumulated[K]>> => {
+            throw new Error("Materialize not supported in batch mode");
+          },
+          hasSnapshot: (_key: keyof TAccumulated): boolean => {
+            return true; // In batch mode, all state is available
+          },
+        };
 
-				// Execute the streaming step
-				const streamingContext: StreamingStepContext<TInput, TAccumulated, TContext> = {
-					input: inputGenerator(),
-					state: streamingState,
-					context: ctx.context,
-				};
+        // Execute the streaming step
+        const streamingContext: StreamingStepContext<TInput, TAccumulated, TContext> = {
+          input: inputGenerator(),
+          state: streamingState,
+          context: ctx.context,
+        };
 
-				const generator = streamingStep.execute(streamingContext);
+        const generator = streamingStep.execute(streamingContext);
 
-				// Collect all results
-				const results: TOutput[] = [];
-				for await (const item of generator) {
-					results.push(item);
-				}
+        // Collect all results
+        const results: TOutput[] = [];
+        for await (const item of generator) {
+          results.push(item);
+        }
 
-				const endTime = Date.now();
+        const endTime = Date.now();
 
-				return {
-					success: true,
-					data: results,
-					metadata: {
-						stepName: streamingStep.name,
-						startTime,
-						endTime,
-						durationMs: endTime - startTime,
-					},
-				};
-			} catch (error) {
-				const endTime = Date.now();
-				const errorMessage = error instanceof Error ? error.message : String(error);
+        return {
+          success: true,
+          data: results,
+          metadata: {
+            stepName: streamingStep.name,
+            startTime,
+            endTime,
+            durationMs: endTime - startTime,
+          },
+        };
+      } catch (error) {
+        const endTime = Date.now();
+        const errorMessage = error instanceof Error ? error.message : String(error);
 
-				return {
-					success: false,
-					error: {
-						code: "BATCH_CONVERSION_ERROR",
-						message: errorMessage,
-						cause: error,
-						retryable: false,
-					},
-					metadata: {
-						stepName: streamingStep.name,
-						startTime: Date.now(),
-						endTime,
-						durationMs: 0,
-					},
-				};
-			}
-		},
-		...(streamingStep.retry && { retry: streamingStep.retry }),
-	};
+        return {
+          success: false,
+          error: {
+            code: "BATCH_CONVERSION_ERROR",
+            message: errorMessage,
+            cause: error,
+            retryable: false,
+          },
+          metadata: {
+            stepName: streamingStep.name,
+            startTime: Date.now(),
+            endTime,
+            durationMs: 0,
+          },
+        };
+      }
+    },
+    ...(streamingStep.retry && { retry: streamingStep.retry }),
+  };
 }
 
 /**
@@ -274,34 +276,35 @@ export function toBatchStep<
  * ```
  */
 export interface HybridStep<
-	TInput,
-	TOutput,
-	TAccumulated extends Record<string, any> = Record<string, never>,
-	TContext = unknown,
+  TInput,
+  TOutput,
+  // biome-ignore lint/suspicious/noExplicitAny: Generic constraint requires any to allow flexible accumulated state types
+  TAccumulated extends Record<string, any> = Record<string, never>,
+  TContext = unknown,
 > {
-	/** Step name */
-	name: string;
+  /** Step name */
+  name: string;
 
-	/**
-	 * Batch mode execution - processes arrays.
-	 */
-	execute: (ctx: StepExecutionContext<TInput[], TAccumulated, TContext>) => ReturnType<
-		Step<TInput[], TOutput[], TAccumulated, TContext>["execute"]
-	>;
+  /**
+   * Batch mode execution - processes arrays.
+   */
+  execute: (
+    ctx: StepExecutionContext<TInput[], TAccumulated, TContext>,
+  ) => ReturnType<Step<TInput[], TOutput[], TAccumulated, TContext>["execute"]>;
 
-	/**
-	 * Streaming mode execution - processes items one by one.
-	 */
-	stream: (ctx: StreamingStepContext<TInput, TAccumulated, TContext>) => AsyncGenerator<TOutput>;
+  /**
+   * Streaming mode execution - processes items one by one.
+   */
+  stream: (ctx: StreamingStepContext<TInput, TAccumulated, TContext>) => AsyncGenerator<TOutput>;
 
-	/**
-	 * Optional retry configuration (applies to both modes).
-	 */
-	retry?: {
-		maxAttempts: number;
-		backoffMs: number;
-		retryableErrors?: string[];
-	};
+  /**
+   * Optional retry configuration (applies to both modes).
+   */
+  retry?: {
+    maxAttempts: number;
+    backoffMs: number;
+    retryableErrors?: string[];
+  };
 }
 
 /**
@@ -311,16 +314,17 @@ export interface HybridStep<
  * @returns A batch step that can be used in Pipeline
  */
 export function toBatchMode<
-	TInput,
-	TOutput,
-	TAccumulated extends Record<string, any> = Record<string, never>,
-	TContext = unknown,
+  TInput,
+  TOutput,
+  // biome-ignore lint/suspicious/noExplicitAny: Generic constraint requires any to allow flexible accumulated state types
+  TAccumulated extends Record<string, any> = Record<string, never>,
+  TContext = unknown,
 >(hybridStep: HybridStep<TInput, TOutput, TAccumulated, TContext>): Step<TInput[], TOutput[], TAccumulated, TContext> {
-	return {
-		name: hybridStep.name,
-		execute: hybridStep.execute,
-		...(hybridStep.retry && { retry: hybridStep.retry }),
-	};
+  return {
+    name: hybridStep.name,
+    execute: hybridStep.execute,
+    ...(hybridStep.retry && { retry: hybridStep.retry }),
+  };
 }
 
 /**
@@ -330,18 +334,19 @@ export function toBatchMode<
  * @returns A streaming step that can be used in StreamingPipeline
  */
 export function toStreamingMode<
-	TInput,
-	TOutput,
-	TAccumulated extends Record<string, any> = Record<string, never>,
-	TContext = unknown,
+  TInput,
+  TOutput,
+  // biome-ignore lint/suspicious/noExplicitAny: Generic constraint requires any to allow flexible accumulated state types
+  TAccumulated extends Record<string, any> = Record<string, never>,
+  TContext = unknown,
 >(
-	hybridStep: HybridStep<TInput, TOutput, TAccumulated, TContext>,
+  hybridStep: HybridStep<TInput, TOutput, TAccumulated, TContext>,
 ): StreamingStep<TInput, TOutput, TAccumulated, TContext> {
-	return {
-		name: hybridStep.name,
-		execute: hybridStep.stream,
-		...(hybridStep.retry && { retry: hybridStep.retry }),
-	};
+  return {
+    name: hybridStep.name,
+    execute: hybridStep.stream,
+    ...(hybridStep.retry && { retry: hybridStep.retry }),
+  };
 }
 
 /**
@@ -385,69 +390,70 @@ export function toStreamingMode<
  * ```
  */
 export function createHybridStep<
-	TInput,
-	TOutput,
-	TAccumulated extends Record<string, any> = Record<string, never>,
-	TContext = unknown,
+  TInput,
+  TOutput,
+  // biome-ignore lint/suspicious/noExplicitAny: Generic constraint requires any to allow flexible accumulated state types
+  TAccumulated extends Record<string, any> = Record<string, never>,
+  TContext = unknown,
 >(
-	name: string,
-	batchFn: (ctx: StepExecutionContext<TInput[], TAccumulated, TContext>) => Promise<TOutput[]>,
-	streamFn: (ctx: StreamingStepContext<TInput, TAccumulated, TContext>) => AsyncGenerator<TOutput>,
-	options?: {
-		retry?: {
-			maxAttempts: number;
-			backoffMs: number;
-			retryableErrors?: string[];
-		};
-	},
+  name: string,
+  batchFn: (ctx: StepExecutionContext<TInput[], TAccumulated, TContext>) => Promise<TOutput[]>,
+  streamFn: (ctx: StreamingStepContext<TInput, TAccumulated, TContext>) => AsyncGenerator<TOutput>,
+  options?: {
+    retry?: {
+      maxAttempts: number;
+      backoffMs: number;
+      retryableErrors?: string[];
+    };
+  },
 ): HybridStep<TInput, TOutput, TAccumulated, TContext> {
-	return {
-		name,
+  return {
+    name,
 
-		// Batch mode execution
-		execute: async (ctx: StepExecutionContext<TInput[], TAccumulated, TContext>) => {
-			try {
-				const startTime = Date.now();
-				const data = await batchFn(ctx);
-				const endTime = Date.now();
+    // Batch mode execution
+    execute: async (ctx: StepExecutionContext<TInput[], TAccumulated, TContext>) => {
+      try {
+        const startTime = Date.now();
+        const data = await batchFn(ctx);
+        const endTime = Date.now();
 
-				return {
-					success: true,
-					data,
-					metadata: {
-						stepName: name,
-						startTime,
-						endTime,
-						durationMs: endTime - startTime,
-					},
-				};
-			} catch (error) {
-				const endTime = Date.now();
-				const errorMessage = error instanceof Error ? error.message : String(error);
+        return {
+          success: true,
+          data,
+          metadata: {
+            stepName: name,
+            startTime,
+            endTime,
+            durationMs: endTime - startTime,
+          },
+        };
+      } catch (error) {
+        const endTime = Date.now();
+        const errorMessage = error instanceof Error ? error.message : String(error);
 
-				return {
-					success: false,
-					error: {
-						code: "HYBRID_STEP_ERROR",
-						message: errorMessage,
-						cause: error,
-						retryable: false,
-					},
-					metadata: {
-						stepName: name,
-						startTime: Date.now(),
-						endTime,
-						durationMs: 0,
-					},
-				};
-			}
-		},
+        return {
+          success: false,
+          error: {
+            code: "HYBRID_STEP_ERROR",
+            message: errorMessage,
+            cause: error,
+            retryable: false,
+          },
+          metadata: {
+            stepName: name,
+            startTime: Date.now(),
+            endTime,
+            durationMs: 0,
+          },
+        };
+      }
+    },
 
-		// Streaming mode execution
-		stream: streamFn,
+    // Streaming mode execution
+    stream: streamFn,
 
-		...(options?.retry && { retry: options.retry }),
-	};
+    ...(options?.retry && { retry: options.retry }),
+  };
 }
 
 /**
@@ -456,47 +462,47 @@ export function createHybridStep<
  * Helps identify which steps are good candidates for streaming conversion.
  */
 export enum StepCategory {
-	/**
-	 * Pure transformation steps that map 1:1 input to output.
-	 * Examples: uppercase, parse JSON, extract fields
-	 * Streaming: Excellent candidate (no buffering needed)
-	 */
-	PURE_TRANSFORM = "PURE_TRANSFORM",
+  /**
+   * Pure transformation steps that map 1:1 input to output.
+   * Examples: uppercase, parse JSON, extract fields
+   * Streaming: Excellent candidate (no buffering needed)
+   */
+  PURE_TRANSFORM = "PURE_TRANSFORM",
 
-	/**
-	 * Aggregation steps that need the full dataset.
-	 * Examples: sort, group by, calculate statistics
-	 * Streaming: Poor candidate (requires full materialization)
-	 */
-	AGGREGATION = "AGGREGATION",
+  /**
+   * Aggregation steps that need the full dataset.
+   * Examples: sort, group by, calculate statistics
+   * Streaming: Poor candidate (requires full materialization)
+   */
+  AGGREGATION = "AGGREGATION",
 
-	/**
-	 * Stateful steps that maintain state across items.
-	 * Examples: deduplication, running average, rate limiting
-	 * Streaming: Good candidate (bounded state)
-	 */
-	STATEFUL = "STATEFUL",
+  /**
+   * Stateful steps that maintain state across items.
+   * Examples: deduplication, running average, rate limiting
+   * Streaming: Good candidate (bounded state)
+   */
+  STATEFUL = "STATEFUL",
 
-	/**
-	 * I/O-bound steps that perform external operations.
-	 * Examples: API calls, database queries, file operations
-	 * Streaming: Excellent candidate (benefits from concurrency control)
-	 */
-	IO_BOUND = "IO_BOUND",
+  /**
+   * I/O-bound steps that perform external operations.
+   * Examples: API calls, database queries, file operations
+   * Streaming: Excellent candidate (benefits from concurrency control)
+   */
+  IO_BOUND = "IO_BOUND",
 
-	/**
-	 * Expansion steps that output multiple items per input.
-	 * Examples: chunk splitter, record flattener
-	 * Streaming: Excellent candidate (reduces memory pressure)
-	 */
-	EXPANSION = "EXPANSION",
+  /**
+   * Expansion steps that output multiple items per input.
+   * Examples: chunk splitter, record flattener
+   * Streaming: Excellent candidate (reduces memory pressure)
+   */
+  EXPANSION = "EXPANSION",
 
-	/**
-	 * Reduction steps that output fewer items than input.
-	 * Examples: filter, deduplication, sampling
-	 * Streaming: Good candidate (reduces downstream load)
-	 */
-	REDUCTION = "REDUCTION",
+  /**
+   * Reduction steps that output fewer items than input.
+   * Examples: filter, deduplication, sampling
+   * Streaming: Good candidate (reduces downstream load)
+   */
+  REDUCTION = "REDUCTION",
 }
 
 /**
@@ -519,89 +525,89 @@ export enum StepCategory {
  * ```
  */
 export function categorizeStep<TInput, TOutput, TAccumulated, TContext>(
-	step: Step<TInput, TOutput, TAccumulated, TContext>,
+  step: Step<TInput, TOutput, TAccumulated, TContext>,
 ): StepCategory {
-	// This is a heuristic-based categorization
-	// In practice, developers would manually categorize their steps
-	// or use naming conventions
+  // This is a heuristic-based categorization
+  // In practice, developers would manually categorize their steps
+  // or use naming conventions
 
-	const name = step.name.toLowerCase();
+  const name = step.name.toLowerCase();
 
-	// I/O operations
-	if (
-		name.includes("read") ||
-		name.includes("write") ||
-		name.includes("fetch") ||
-		name.includes("api") ||
-		name.includes("db") ||
-		name.includes("database")
-	) {
-		return StepCategory.IO_BOUND;
-	}
+  // I/O operations
+  if (
+    name.includes("read") ||
+    name.includes("write") ||
+    name.includes("fetch") ||
+    name.includes("api") ||
+    name.includes("db") ||
+    name.includes("database")
+  ) {
+    return StepCategory.IO_BOUND;
+  }
 
-	// Aggregations
-	if (
-		name.includes("sort") ||
-		name.includes("group") ||
-		name.includes("aggregate") ||
-		name.includes("sum") ||
-		name.includes("count") ||
-		name.includes("statistics")
-	) {
-		return StepCategory.AGGREGATION;
-	}
+  // Aggregations
+  if (
+    name.includes("sort") ||
+    name.includes("group") ||
+    name.includes("aggregate") ||
+    name.includes("sum") ||
+    name.includes("count") ||
+    name.includes("statistics")
+  ) {
+    return StepCategory.AGGREGATION;
+  }
 
-	// Expansions
-	if (
-		name.includes("split") ||
-		name.includes("chunk") ||
-		name.includes("expand") ||
-		name.includes("flatten") ||
-		name.includes("flatmap")
-	) {
-		return StepCategory.EXPANSION;
-	}
+  // Expansions
+  if (
+    name.includes("split") ||
+    name.includes("chunk") ||
+    name.includes("expand") ||
+    name.includes("flatten") ||
+    name.includes("flatmap")
+  ) {
+    return StepCategory.EXPANSION;
+  }
 
-	// Reductions
-	if (
-		name.includes("filter") ||
-		name.includes("dedupe") ||
-		name.includes("sample") ||
-		name.includes("limit") ||
-		name.includes("take")
-	) {
-		return StepCategory.REDUCTION;
-	}
+  // Reductions
+  if (
+    name.includes("filter") ||
+    name.includes("dedupe") ||
+    name.includes("sample") ||
+    name.includes("limit") ||
+    name.includes("take")
+  ) {
+    return StepCategory.REDUCTION;
+  }
 
-	// Stateful
-	if (
-		name.includes("cache") ||
-		name.includes("memo") ||
-		name.includes("state") ||
-		name.includes("rate") ||
-		name.includes("throttle")
-	) {
-		return StepCategory.STATEFUL;
-	}
+  // Stateful
+  if (
+    name.includes("cache") ||
+    name.includes("memo") ||
+    name.includes("state") ||
+    name.includes("rate") ||
+    name.includes("throttle")
+  ) {
+    return StepCategory.STATEFUL;
+  }
 
-	// Default to pure transform
-	return StepCategory.PURE_TRANSFORM;
+  // Default to pure transform
+  return StepCategory.PURE_TRANSFORM;
 }
 
 /**
  * Migration recommendation for a step.
  */
 export interface MigrationRecommendation {
-	/** The step category */
-	category: StepCategory;
-	/** Whether streaming is recommended */
-	recommended: boolean;
-	/** Recommendation strength (0-1, higher is better) */
-	strength: number;
-	/** Explanation of the recommendation */
-	reason: string;
-	/** Suggested approach */
-	approach: "toStreamingStep" | "createHybridStep" | "keep_batch" | "manual_conversion";
+  /** The step category */
+  category: StepCategory;
+  /** Whether streaming is recommended */
+  recommended: boolean;
+  /** Recommendation strength (0-1, higher is better) */
+  strength: number;
+  /** Explanation of the recommendation */
+  reason: string;
+  /** Suggested approach */
+  approach: "toStreamingStep" | "createHybridStep" | "keep_batch" | "manual_conversion";
 }
 
 /**
@@ -624,78 +630,78 @@ export interface MigrationRecommendation {
  * ```
  */
 export function getMigrationRecommendation<TInput, TOutput, TAccumulated, TContext>(
-	step: Step<TInput, TOutput, TAccumulated, TContext>,
+  step: Step<TInput, TOutput, TAccumulated, TContext>,
 ): MigrationRecommendation {
-	const category = categorizeStep(step);
+  const category = categorizeStep(step);
 
-	switch (category) {
-		case StepCategory.PURE_TRANSFORM:
-			return {
-				category,
-				recommended: true,
-				strength: 0.9,
-				reason:
-					"Pure transformations stream naturally with no buffering. Excellent candidate for toStreamingStep() wrapper.",
-				approach: "toStreamingStep",
-			};
+  switch (category) {
+    case StepCategory.PURE_TRANSFORM:
+      return {
+        category,
+        recommended: true,
+        strength: 0.9,
+        reason:
+          "Pure transformations stream naturally with no buffering. Excellent candidate for toStreamingStep() wrapper.",
+        approach: "toStreamingStep",
+      };
 
-		case StepCategory.IO_BOUND:
-			return {
-				category,
-				recommended: true,
-				strength: 0.95,
-				reason:
-					"I/O-bound operations benefit greatly from streaming's concurrency control and backpressure. Use toStreamingStep() with parallel options.",
-				approach: "toStreamingStep",
-			};
+    case StepCategory.IO_BOUND:
+      return {
+        category,
+        recommended: true,
+        strength: 0.95,
+        reason:
+          "I/O-bound operations benefit greatly from streaming's concurrency control and backpressure. Use toStreamingStep() with parallel options.",
+        approach: "toStreamingStep",
+      };
 
-		case StepCategory.EXPANSION:
-			return {
-				category,
-				recommended: true,
-				strength: 0.9,
-				reason:
-					"Expansion steps generate multiple outputs per input, streaming reduces memory pressure significantly. Consider manual conversion for flatMap semantics.",
-				approach: "manual_conversion",
-			};
+    case StepCategory.EXPANSION:
+      return {
+        category,
+        recommended: true,
+        strength: 0.9,
+        reason:
+          "Expansion steps generate multiple outputs per input, streaming reduces memory pressure significantly. Consider manual conversion for flatMap semantics.",
+        approach: "manual_conversion",
+      };
 
-		case StepCategory.REDUCTION:
-			return {
-				category,
-				recommended: true,
-				strength: 0.8,
-				reason:
-					"Reduction steps decrease downstream load, good streaming candidate. Use toStreamingStep() or createHybridStep().",
-				approach: "createHybridStep",
-			};
+    case StepCategory.REDUCTION:
+      return {
+        category,
+        recommended: true,
+        strength: 0.8,
+        reason:
+          "Reduction steps decrease downstream load, good streaming candidate. Use toStreamingStep() or createHybridStep().",
+        approach: "createHybridStep",
+      };
 
-		case StepCategory.STATEFUL:
-			return {
-				category,
-				recommended: true,
-				strength: 0.7,
-				reason:
-					"Stateful steps can stream if state is bounded. Consider manual conversion to manage state lifecycle properly.",
-				approach: "manual_conversion",
-			};
+    case StepCategory.STATEFUL:
+      return {
+        category,
+        recommended: true,
+        strength: 0.7,
+        reason:
+          "Stateful steps can stream if state is bounded. Consider manual conversion to manage state lifecycle properly.",
+        approach: "manual_conversion",
+      };
 
-		case StepCategory.AGGREGATION:
-			return {
-				category,
-				recommended: false,
-				strength: 0.3,
-				reason:
-					"Aggregations require full dataset, defeating streaming benefits. Keep as batch or use windowing for approximate results.",
-				approach: "keep_batch",
-			};
+    case StepCategory.AGGREGATION:
+      return {
+        category,
+        recommended: false,
+        strength: 0.3,
+        reason:
+          "Aggregations require full dataset, defeating streaming benefits. Keep as batch or use windowing for approximate results.",
+        approach: "keep_batch",
+      };
 
-		default:
-			return {
-				category,
-				recommended: true,
-				strength: 0.5,
-				reason: "Unknown category, default to streaming with caution. Review step logic carefully.",
-				approach: "toStreamingStep",
-			};
-	}
+    default:
+      return {
+        category,
+        recommended: true,
+        strength: 0.5,
+        reason: "Unknown category, default to streaming with caution. Review step logic carefully.",
+        approach: "toStreamingStep",
+      };
+  }
 }

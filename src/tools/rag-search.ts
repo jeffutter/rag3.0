@@ -37,9 +37,7 @@ function createSearchArgsSchema(availableTags: string[]) {
     tags: z
       .array(z.string())
       .optional()
-      .describe(
-        `Boost results by tags. Choose relevant tags from this list if applicable: ${tagList}. Each matching tag adds a 0.25 score boost. Multiple tags can be provided for higher boosts.`,
-      ),
+      .describe(`Boost results by tags. Choose relevant tags from this list if applicable: ${tagList}`),
     start_date_time: z
       .string()
       .optional()

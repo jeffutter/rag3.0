@@ -25,6 +25,7 @@ describe("StreamingState", () => {
 
     test("hasSnapshot returns false for non-existent keys", () => {
       const state = createEmptyStreamingState();
+      // biome-ignore lint/suspicious/noExplicitAny: Testing with invalid key type
       expect(state.hasSnapshot("nonexistent" as any)).toBe(false);
     });
   });
@@ -85,6 +86,7 @@ describe("StreamingState", () => {
       const state = createEmptyStreamingState();
 
       try {
+        // biome-ignore lint/suspicious/noExplicitAny: Testing error handling with invalid key type
         await collectStream(state.stream("nonexistent" as any));
         expect.unreachable("Should have thrown");
       } catch (error) {
@@ -144,6 +146,7 @@ describe("StreamingState", () => {
       const state = createEmptyStreamingState();
 
       try {
+        // biome-ignore lint/suspicious/noExplicitAny: Testing error handling with invalid key type
         await state.materialize("nonexistent" as any);
         expect.unreachable("Should have thrown");
       } catch (error) {

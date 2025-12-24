@@ -10,8 +10,8 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { StreamingPipeline, streamingStep } from "./streaming-builder";
 import { fromArray } from "./streaming/generators";
+import { StreamingPipeline, streamingStep } from "./streaming-builder";
 
 describe("StreamingPipeline.start()", () => {
   test("creates a new streaming pipeline", () => {
@@ -28,41 +28,41 @@ describe("StreamingPipeline.start()", () => {
 
 describe("StreamingPipeline.map()", () => {
   test("maps a transformation over stream items", async () => {
-    const pipeline = StreamingPipeline.start<number>()
-      .map("doubled", (n) => n * 2);
+    const pipeline = StreamingPipeline.start<number>().map("doubled", (n) => n * 2);
 
     const result = await pipeline.executeToArray(fromArray([1, 2, 3]));
     expect(result).toEqual([2, 4, 6]);
   });
 
   test("supports async transformations", async () => {
-    const pipeline = StreamingPipeline.start<number>()
-      .map("delayed", async (n) => {
-        await Bun.sleep(1);
-        return n * 2;
-      });
+    const pipeline = StreamingPipeline.start<number>().map("delayed", async (n) => {
+      await Bun.sleep(1);
+      return n * 2;
+    });
 
     const result = await pipeline.executeToArray(fromArray([1, 2, 3]));
     expect(result).toEqual([2, 4, 6]);
   });
 
   test("provides index to transformation function", async () => {
-    const pipeline = StreamingPipeline.start<string>()
-      .map("indexed", (s, index) => `${index}:${s}`);
+    const pipeline = StreamingPipeline.start<string>().map("indexed", (s, index) => `${index}:${s}`);
 
     const result = await pipeline.executeToArray(fromArray(["a", "b", "c"]));
     expect(result).toEqual(["0:a", "1:b", "2:c"]);
   });
 
   test("supports parallel execution", async () => {
-    let executionOrder: number[] = [];
+    const executionOrder: number[] = [];
 
-    const pipeline = StreamingPipeline.start<number>()
-      .map("parallel", async (n) => {
+    const pipeline = StreamingPipeline.start<number>().map(
+      "parallel",
+      async (n) => {
         await Bun.sleep(10 - n); // Reverse delay so later items finish first
         executionOrder.push(n);
         return n * 2;
-      }, { parallel: true, concurrency: 3 });
+      },
+      { parallel: true, concurrency: 3 },
+    );
 
     const result = await pipeline.executeToArray(fromArray([1, 2, 3]));
 
@@ -85,27 +85,24 @@ describe("StreamingPipeline.map()", () => {
 
 describe("StreamingPipeline.filter()", () => {
   test("filters items based on predicate", async () => {
-    const pipeline = StreamingPipeline.start<number>()
-      .filter("evens", (n) => n % 2 === 0);
+    const pipeline = StreamingPipeline.start<number>().filter("evens", (n) => n % 2 === 0);
 
     const result = await pipeline.executeToArray(fromArray([1, 2, 3, 4, 5]));
     expect(result).toEqual([2, 4]);
   });
 
   test("supports async predicates", async () => {
-    const pipeline = StreamingPipeline.start<number>()
-      .filter("valid", async (n) => {
-        await Bun.sleep(1);
-        return n > 2;
-      });
+    const pipeline = StreamingPipeline.start<number>().filter("valid", async (n) => {
+      await Bun.sleep(1);
+      return n > 2;
+    });
 
     const result = await pipeline.executeToArray(fromArray([1, 2, 3, 4]));
     expect(result).toEqual([3, 4]);
   });
 
   test("provides index to predicate", async () => {
-    const pipeline = StreamingPipeline.start<string>()
-      .filter("oddIndices", (_s, index) => index % 2 === 1);
+    const pipeline = StreamingPipeline.start<string>().filter("oddIndices", (_s, index) => index % 2 === 1);
 
     const result = await pipeline.executeToArray(fromArray(["a", "b", "c", "d"]));
     expect(result).toEqual(["b", "d"]);
@@ -123,35 +120,34 @@ describe("StreamingPipeline.filter()", () => {
 
 describe("StreamingPipeline.flatMap()", () => {
   test("flattens nested results", async () => {
-    const pipeline = StreamingPipeline.start<string>()
-      .flatMap("words", (line) => line.split(" "));
+    const pipeline = StreamingPipeline.start<string>().flatMap("words", (line) => line.split(" "));
 
     const result = await pipeline.executeToArray(fromArray(["hello world", "foo bar"]));
     expect(result).toEqual(["hello", "world", "foo", "bar"]);
   });
 
   test("supports async flatMap", async () => {
-    const pipeline = StreamingPipeline.start<number>()
-      .flatMap("expanded", async (n) => {
-        await Bun.sleep(1);
-        return [n, n * 2];
-      });
+    const pipeline = StreamingPipeline.start<number>().flatMap("expanded", async (n) => {
+      await Bun.sleep(1);
+      return [n, n * 2];
+    });
 
     const result = await pipeline.executeToArray(fromArray([1, 2, 3]));
     expect(result).toEqual([1, 2, 2, 4, 3, 6]);
   });
 
   test("can return empty arrays", async () => {
-    const pipeline = StreamingPipeline.start<number>()
-      .flatMap("conditional", (n) => n > 2 ? [n] : []);
+    const pipeline = StreamingPipeline.start<number>().flatMap("conditional", (n) => (n > 2 ? [n] : []));
 
     const result = await pipeline.executeToArray(fromArray([1, 2, 3, 4]));
     expect(result).toEqual([3, 4]);
   });
 
   test("provides index to flatMap function", async () => {
-    const pipeline = StreamingPipeline.start<string>()
-      .flatMap("indexed", (s, index) => [`${index}:${s}`, `${index}:${s.toUpperCase()}`]);
+    const pipeline = StreamingPipeline.start<string>().flatMap("indexed", (s, index) => [
+      `${index}:${s}`,
+      `${index}:${s.toUpperCase()}`,
+    ]);
 
     const result = await pipeline.executeToArray(fromArray(["a", "b"]));
     expect(result).toEqual(["0:a", "0:A", "1:b", "1:B"]);
@@ -163,7 +159,9 @@ describe("StreamingPipeline.tap()", () => {
     const sideEffects: number[] = [];
 
     const pipeline = StreamingPipeline.start<number>()
-      .tap("logged", (n) => { sideEffects.push(n); })
+      .tap("logged", (n) => {
+        sideEffects.push(n);
+      })
       .map("doubled", (n) => n * 2);
 
     const result = await pipeline.executeToArray(fromArray([1, 2, 3]));
@@ -175,11 +173,10 @@ describe("StreamingPipeline.tap()", () => {
   test("supports async side effects", async () => {
     const sideEffects: number[] = [];
 
-    const pipeline = StreamingPipeline.start<number>()
-      .tap("logged", async (n) => {
-        await Bun.sleep(1);
-        sideEffects.push(n);
-      });
+    const pipeline = StreamingPipeline.start<number>().tap("logged", async (n) => {
+      await Bun.sleep(1);
+      sideEffects.push(n);
+    });
 
     await pipeline.executeToArray(fromArray([1, 2, 3]));
     expect(sideEffects).toEqual([1, 2, 3]);
@@ -188,8 +185,9 @@ describe("StreamingPipeline.tap()", () => {
   test("provides index to tap function", async () => {
     const indices: number[] = [];
 
-    const pipeline = StreamingPipeline.start<string>()
-      .tap("indexed", (_s, index) => { indices.push(index); });
+    const pipeline = StreamingPipeline.start<string>().tap("indexed", (_s, index) => {
+      indices.push(index);
+    });
 
     await pipeline.executeToArray(fromArray(["a", "b", "c"]));
     expect(indices).toEqual([0, 1, 2]);
@@ -198,27 +196,27 @@ describe("StreamingPipeline.tap()", () => {
 
 describe("StreamingPipeline.batch()", () => {
   test("batches items into fixed-size arrays", async () => {
-    const pipeline = StreamingPipeline.start<number>()
-      .batch("batches", 2);
+    const pipeline = StreamingPipeline.start<number>().batch("batches", 2);
 
     const result = await pipeline.executeToArray(fromArray([1, 2, 3, 4, 5]));
     expect(result).toEqual([[1, 2], [3, 4], [5]]);
   });
 
   test("handles empty stream", async () => {
-    const pipeline = StreamingPipeline.start<number>()
-      .batch("batches", 2);
+    const pipeline = StreamingPipeline.start<number>().batch("batches", 2);
 
     const result = await pipeline.executeToArray(fromArray([]));
     expect(result).toEqual([]);
   });
 
   test("handles exact multiples", async () => {
-    const pipeline = StreamingPipeline.start<number>()
-      .batch("batches", 3);
+    const pipeline = StreamingPipeline.start<number>().batch("batches", 3);
 
     const result = await pipeline.executeToArray(fromArray([1, 2, 3, 4, 5, 6]));
-    expect(result).toEqual([[1, 2, 3], [4, 5, 6]]);
+    expect(result).toEqual([
+      [1, 2, 3],
+      [4, 5, 6],
+    ]);
   });
 
   test("can chain with map to process batches", async () => {
@@ -233,24 +231,21 @@ describe("StreamingPipeline.batch()", () => {
 
 describe("StreamingPipeline.take()", () => {
   test("takes first N items", async () => {
-    const pipeline = StreamingPipeline.start<number>()
-      .take("first3", 3);
+    const pipeline = StreamingPipeline.start<number>().take("first3", 3);
 
     const result = await pipeline.executeToArray(fromArray([1, 2, 3, 4, 5]));
     expect(result).toEqual([1, 2, 3]);
   });
 
   test("handles take more than available", async () => {
-    const pipeline = StreamingPipeline.start<number>()
-      .take("first10", 10);
+    const pipeline = StreamingPipeline.start<number>().take("first10", 10);
 
     const result = await pipeline.executeToArray(fromArray([1, 2, 3]));
     expect(result).toEqual([1, 2, 3]);
   });
 
   test("take(0) returns empty", async () => {
-    const pipeline = StreamingPipeline.start<number>()
-      .take("none", 0);
+    const pipeline = StreamingPipeline.start<number>().take("none", 0);
 
     const result = await pipeline.executeToArray(fromArray([1, 2, 3]));
     expect(result).toEqual([]);
@@ -260,7 +255,9 @@ describe("StreamingPipeline.take()", () => {
     let itemsProcessed = 0;
 
     const pipeline = StreamingPipeline.start<number>()
-      .tap("count", () => { itemsProcessed++; })
+      .tap("count", () => {
+        itemsProcessed++;
+      })
       .take("first2", 2);
 
     await pipeline.executeToArray(fromArray([1, 2, 3, 4, 5]));
@@ -272,33 +269,28 @@ describe("StreamingPipeline.take()", () => {
 
 describe("StreamingPipeline.skip()", () => {
   test("skips first N items", async () => {
-    const pipeline = StreamingPipeline.start<number>()
-      .skip("skip2", 2);
+    const pipeline = StreamingPipeline.start<number>().skip("skip2", 2);
 
     const result = await pipeline.executeToArray(fromArray([1, 2, 3, 4, 5]));
     expect(result).toEqual([3, 4, 5]);
   });
 
   test("handles skip more than available", async () => {
-    const pipeline = StreamingPipeline.start<number>()
-      .skip("skip10", 10);
+    const pipeline = StreamingPipeline.start<number>().skip("skip10", 10);
 
     const result = await pipeline.executeToArray(fromArray([1, 2, 3]));
     expect(result).toEqual([]);
   });
 
   test("skip(0) returns all items", async () => {
-    const pipeline = StreamingPipeline.start<number>()
-      .skip("none", 0);
+    const pipeline = StreamingPipeline.start<number>().skip("none", 0);
 
     const result = await pipeline.executeToArray(fromArray([1, 2, 3]));
     expect(result).toEqual([1, 2, 3]);
   });
 
   test("can combine skip and take for pagination", async () => {
-    const pipeline = StreamingPipeline.start<number>()
-      .skip("skipFirst5", 5)
-      .take("next5", 5);
+    const pipeline = StreamingPipeline.start<number>().skip("skipFirst5", 5).take("next5", 5);
 
     const result = await pipeline.executeToArray(fromArray([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]));
     expect(result).toEqual([6, 7, 8, 9, 10]);
@@ -307,27 +299,24 @@ describe("StreamingPipeline.skip()", () => {
 
 describe("StreamingPipeline.takeWhile()", () => {
   test("takes items while predicate is true", async () => {
-    const pipeline = StreamingPipeline.start<number>()
-      .takeWhile("ascending", (n) => n < 3);
+    const pipeline = StreamingPipeline.start<number>().takeWhile("ascending", (n) => n < 3);
 
     const result = await pipeline.executeToArray(fromArray([1, 2, 3, 4, 5]));
     expect(result).toEqual([1, 2]);
   });
 
   test("supports async predicates", async () => {
-    const pipeline = StreamingPipeline.start<number>()
-      .takeWhile("valid", async (n) => {
-        await Bun.sleep(1);
-        return n < 4;
-      });
+    const pipeline = StreamingPipeline.start<number>().takeWhile("valid", async (n) => {
+      await Bun.sleep(1);
+      return n < 4;
+    });
 
     const result = await pipeline.executeToArray(fromArray([1, 2, 3, 4, 5]));
     expect(result).toEqual([1, 2, 3]);
   });
 
   test("provides index to predicate", async () => {
-    const pipeline = StreamingPipeline.start<string>()
-      .takeWhile("first3", (_s, index) => index < 3);
+    const pipeline = StreamingPipeline.start<string>().takeWhile("first3", (_s, index) => index < 3);
 
     const result = await pipeline.executeToArray(fromArray(["a", "b", "c", "d", "e"]));
     expect(result).toEqual(["a", "b", "c"]);
@@ -336,11 +325,10 @@ describe("StreamingPipeline.takeWhile()", () => {
   test("stops on first false", async () => {
     let itemsChecked = 0;
 
-    const pipeline = StreamingPipeline.start<number>()
-      .takeWhile("check", (n) => {
-        itemsChecked++;
-        return n < 3;
-      });
+    const pipeline = StreamingPipeline.start<number>().takeWhile("check", (n) => {
+      itemsChecked++;
+      return n < 3;
+    });
 
     await pipeline.executeToArray(fromArray([1, 2, 3, 4, 5]));
 
@@ -351,27 +339,24 @@ describe("StreamingPipeline.takeWhile()", () => {
 
 describe("StreamingPipeline.skipWhile()", () => {
   test("skips items while predicate is true", async () => {
-    const pipeline = StreamingPipeline.start<number>()
-      .skipWhile("skipSmall", (n) => n < 3);
+    const pipeline = StreamingPipeline.start<number>().skipWhile("skipSmall", (n) => n < 3);
 
     const result = await pipeline.executeToArray(fromArray([1, 2, 3, 4, 5]));
     expect(result).toEqual([3, 4, 5]);
   });
 
   test("supports async predicates", async () => {
-    const pipeline = StreamingPipeline.start<number>()
-      .skipWhile("skipNegative", async (n) => {
-        await Bun.sleep(1);
-        return n < 0;
-      });
+    const pipeline = StreamingPipeline.start<number>().skipWhile("skipNegative", async (n) => {
+      await Bun.sleep(1);
+      return n < 0;
+    });
 
     const result = await pipeline.executeToArray(fromArray([-2, -1, 0, 1, 2]));
     expect(result).toEqual([0, 1, 2]);
   });
 
   test("provides index to predicate", async () => {
-    const pipeline = StreamingPipeline.start<string>()
-      .skipWhile("skip2", (_s, index) => index < 2);
+    const pipeline = StreamingPipeline.start<string>().skipWhile("skip2", (_s, index) => index < 2);
 
     const result = await pipeline.executeToArray(fromArray(["a", "b", "c", "d"]));
     expect(result).toEqual(["c", "d"]);
@@ -380,8 +365,7 @@ describe("StreamingPipeline.skipWhile()", () => {
 
 describe("StreamingPipeline.build()", () => {
   test("returns a generator function", async () => {
-    const pipeline = StreamingPipeline.start<number>()
-      .map("doubled", (n) => n * 2);
+    const pipeline = StreamingPipeline.start<number>().map("doubled", (n) => n * 2);
 
     const transform = pipeline.build();
     expect(typeof transform).toBe("function");
@@ -399,7 +383,9 @@ describe("StreamingPipeline.build()", () => {
     let itemsProcessed = 0;
 
     const pipeline = StreamingPipeline.start<number>()
-      .tap("count", () => { itemsProcessed++; })
+      .tap("count", () => {
+        itemsProcessed++;
+      })
       .map("doubled", (n) => n * 2);
 
     const transform = pipeline.build();
@@ -423,8 +409,7 @@ describe("StreamingPipeline.build()", () => {
 
 describe("StreamingPipeline.execute()", () => {
   test("executes pipeline and returns async generator", async () => {
-    const pipeline = StreamingPipeline.start<number>()
-      .map("doubled", (n) => n * 2);
+    const pipeline = StreamingPipeline.start<number>().map("doubled", (n) => n * 2);
 
     const result = pipeline.execute(fromArray([1, 2, 3]));
     const array = [];
@@ -437,8 +422,7 @@ describe("StreamingPipeline.execute()", () => {
   });
 
   test("supports single item input", async () => {
-    const pipeline = StreamingPipeline.start<number>()
-      .map("doubled", (n) => n * 2);
+    const pipeline = StreamingPipeline.start<number>().map("doubled", (n) => n * 2);
 
     const result = pipeline.execute(5);
     const array = [];
@@ -462,8 +446,7 @@ describe("StreamingPipeline.executeToArray()", () => {
   });
 
   test("returns empty array for empty stream", async () => {
-    const pipeline = StreamingPipeline.start<number>()
-      .map("doubled", (n) => n * 2);
+    const pipeline = StreamingPipeline.start<number>().map("doubled", (n) => n * 2);
 
     const result = await pipeline.executeToArray(fromArray([]));
     expect(result).toEqual([]);
@@ -474,8 +457,7 @@ describe("StreamingPipeline.forEach()", () => {
   test("executes side effect for each item", async () => {
     const collected: number[] = [];
 
-    const pipeline = StreamingPipeline.start<number>()
-      .map("doubled", (n) => n * 2);
+    const pipeline = StreamingPipeline.start<number>().map("doubled", (n) => n * 2);
 
     await pipeline.forEach(fromArray([1, 2, 3]), (item) => {
       collected.push(item);
@@ -514,11 +496,7 @@ describe("StreamingPipeline.reduce()", () => {
   test("reduces stream to single value", async () => {
     const pipeline = StreamingPipeline.start<number>();
 
-    const sum = await pipeline.reduce(
-      fromArray([1, 2, 3, 4]),
-      (acc, n) => acc + n,
-      0
-    );
+    const sum = await pipeline.reduce(fromArray([1, 2, 3, 4]), (acc, n) => acc + n, 0);
 
     expect(sum).toBe(10);
   });
@@ -529,7 +507,7 @@ describe("StreamingPipeline.reduce()", () => {
     const result = await pipeline.reduce(
       fromArray(["a", "b", "c"]),
       (acc, item, index) => ({ ...acc, [index]: item }),
-      {} as Record<number, string>
+      {} as Record<number, string>,
     );
 
     expect(result).toEqual({ 0: "a", 1: "b", 2: "c" });
@@ -544,7 +522,7 @@ describe("StreamingPipeline.reduce()", () => {
         await Bun.sleep(1);
         return acc + n;
       },
-      0
+      0,
     );
 
     expect(sum).toBe(6);
@@ -553,24 +531,15 @@ describe("StreamingPipeline.reduce()", () => {
   test("returns initial value for empty stream", async () => {
     const pipeline = StreamingPipeline.start<number>();
 
-    const result = await pipeline.reduce(
-      fromArray([]),
-      (acc, n) => acc + n,
-      42
-    );
+    const result = await pipeline.reduce(fromArray([]), (acc, n) => acc + n, 42);
 
     expect(result).toBe(42);
   });
 
   test("can count items", async () => {
-    const pipeline = StreamingPipeline.start<string>()
-      .filter("long", (s) => s.length > 3);
+    const pipeline = StreamingPipeline.start<string>().filter("long", (s) => s.length > 3);
 
-    const count = await pipeline.reduce(
-      fromArray(["a", "hello", "b", "world"]),
-      (acc) => acc + 1,
-      0
-    );
+    const count = await pipeline.reduce(fromArray(["a", "hello", "b", "world"]), (acc) => acc + 1, 0);
 
     expect(count).toBe(2);
   });
@@ -599,10 +568,10 @@ describe("StreamingPipeline complex compositions", () => {
 
   test("type safety through chain", async () => {
     const pipeline = StreamingPipeline.start<number>()
-      .map("strings", (n) => n.toString())  // number -> string
-      .map("lengths", (s) => s.length)      // string -> number
-      .filter("positive", (n) => n > 0)     // number -> number
-      .batch("batches", 2)                  // number -> number[]
+      .map("strings", (n) => n.toString()) // number -> string
+      .map("lengths", (s) => s.length) // string -> number
+      .filter("positive", (n) => n > 0) // number -> number
+      .batch("batches", 2) // number -> number[]
       .map("counts", (batch) => batch.length); // number[] -> number
 
     const result = await pipeline.executeToArray(fromArray([1, 22, 333]));
@@ -612,31 +581,24 @@ describe("StreamingPipeline complex compositions", () => {
 
 describe("streamingStep() helper", () => {
   test("creates a streaming step", async () => {
-    const doubleStep = streamingStep<number, number>(
-      "double",
-      async function* ({ input }) {
-        for await (const n of input) {
-          yield n * 2;
-        }
+    const doubleStep = streamingStep<number, number>("double", async function* ({ input }) {
+      for await (const n of input) {
+        yield n * 2;
       }
-    );
+    });
 
     expect(doubleStep.name).toBe("double");
     expect(doubleStep.execute).toBeDefined();
   });
 
   test("works with pipeline.add()", async () => {
-    const doubleStep = streamingStep<number, number>(
-      "double",
-      async function* ({ input }) {
-        for await (const n of input) {
-          yield n * 2;
-        }
+    const doubleStep = streamingStep<number, number>("double", async function* ({ input }) {
+      for await (const n of input) {
+        yield n * 2;
       }
-    );
+    });
 
-    const pipeline = StreamingPipeline.start<number>()
-      .add("doubled", doubleStep);
+    const pipeline = StreamingPipeline.start<number>().add("doubled", doubleStep);
 
     const result = await pipeline.executeToArray(fromArray([1, 2, 3]));
     expect(result).toEqual([2, 4, 6]);
@@ -654,7 +616,7 @@ describe("streamingStep() helper", () => {
         maxAttempts: 3,
         backoffMs: 1000,
         retryableErrors: ["ETIMEDOUT"],
-      }
+      },
     );
 
     expect(step.retry).toEqual({

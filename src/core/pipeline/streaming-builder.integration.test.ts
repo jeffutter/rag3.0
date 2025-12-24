@@ -10,8 +10,8 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { StreamingPipeline, streamingStep } from "./streaming-builder";
 import { fromArray } from "./streaming/generators";
+import { StreamingPipeline, streamingStep } from "./streaming-builder";
 
 describe("StreamingPipeline Integration - Document Processing", () => {
   interface Document {
@@ -52,7 +52,7 @@ describe("StreamingPipeline Integration - Document Processing", () => {
     // Simulate embedding generation (just use content length as embedding)
     const generateEmbedding = async (chunks: Chunk[]): Promise<EmbeddedChunk[]> => {
       await Bun.sleep(5); // Simulate API call
-      return chunks.map(chunk => ({
+      return chunks.map((chunk) => ({
         ...chunk,
         embedding: [chunk.content.length, chunk.content.charCodeAt(0)],
       }));
@@ -70,11 +70,11 @@ describe("StreamingPipeline Integration - Document Processing", () => {
 
     // Verify results
     expect(results.length).toBeGreaterThan(0);
-    expect(results.every(r => r.embedding && r.embedding.length > 0)).toBe(true);
-    expect(results.every(r => r.documentId && r.content)).toBe(true);
+    expect(results.every((r) => r.embedding && r.embedding.length > 0)).toBe(true);
+    expect(results.every((r) => r.documentId && r.content)).toBe(true);
 
     // Check that chunks from all documents are present
-    const docIds = new Set(results.map(r => r.documentId));
+    const docIds = new Set(results.map((r) => r.documentId));
     expect(docIds.size).toBe(3);
   });
 
@@ -83,7 +83,9 @@ describe("StreamingPipeline Integration - Document Processing", () => {
     let chunksCreated = 0;
 
     const pipeline = StreamingPipeline.start<Document>()
-      .tap("countDocs", () => { documentsProcessed++; })
+      .tap("countDocs", () => {
+        documentsProcessed++;
+      })
       .flatMap("chunks", (doc) => {
         const chunks = doc.content.split(". ").map((c, i) => ({
           id: `${doc.id}-${i}`,
@@ -120,6 +122,7 @@ describe("StreamingPipeline Integration - Data Transformation", () => {
     metadata?: Record<string, unknown>;
   }
 
+  // biome-ignore lint/correctness/noUnusedVariables: Type definition for documentation/future use
   interface ErrorSummary {
     hour: number;
     count: number;
@@ -149,7 +152,7 @@ describe("StreamingPipeline Integration - Data Transformation", () => {
     expect(batches.length).toBeGreaterThan(0);
     const allErrors = batches.flat();
     expect(allErrors.length).toBe(3);
-    expect(allErrors.every(e => e.level === "error")).toBe(true);
+    expect(allErrors.every((e) => e.level === "error")).toBe(true);
   });
 
   test("real-time event stream processing", async () => {
@@ -178,9 +181,9 @@ describe("StreamingPipeline Integration - Data Transformation", () => {
     const results = await pipeline.executeToArray(fromArray(events));
 
     expect(results.length).toBeLessThanOrEqual(10);
-    expect(results.every(r => r.type === "critical")).toBe(true);
-    expect(results.every(r => r.value > 50)).toBe(true);
-    expect(results.every(r => r.priority === "high")).toBe(true);
+    expect(results.every((r) => r.type === "critical")).toBe(true);
+    expect(results.every((r) => r.value > 50)).toBe(true);
+    expect(results.every((r) => r.priority === "high")).toBe(true);
   });
 });
 
@@ -249,7 +252,7 @@ describe("StreamingPipeline Integration - Batching Strategies", () => {
     const batchProcess = async (items: number[]): Promise<number[]> => {
       apiCallCount++;
       await Bun.sleep(10); // Simulate API call
-      return items.map(n => n * 2);
+      return items.map((n) => n * 2);
     };
 
     const pipeline = StreamingPipeline.start<number>()
@@ -275,10 +278,12 @@ describe("StreamingPipeline Integration - Batching Strategies", () => {
         items: batch,
         sum: batch.reduce((a, b) => a + b, 0),
       }))
-      .flatMap("unbatched", (batchResult) => batchResult.items.map(item => ({
-        item,
-        batchSum: batchResult.sum,
-      })));
+      .flatMap("unbatched", (batchResult) =>
+        batchResult.items.map((item) => ({
+          item,
+          batchSum: batchResult.sum,
+        })),
+      );
 
     const results = await pipeline.executeToArray(fromArray([1, 2, 3, 4, 5, 6, 7]));
 
@@ -320,10 +325,13 @@ describe("StreamingPipeline Integration - Complex Transformations", () => {
         ...user,
         score: user.name.length * 10,
       }))
-      .map("withRank", (user: UserWithScore): UserWithRank => ({
-        ...user,
-        rank: user.score > 50 ? "high" : "low",
-      }))
+      .map(
+        "withRank",
+        (user: UserWithScore): UserWithRank => ({
+          ...user,
+          rank: user.score > 50 ? "high" : "low",
+        }),
+      )
       .filter("highRank", (user: UserWithRank) => user.rank === "high");
 
     const results = await pipeline.executeToArray(fromArray(users));
@@ -345,6 +353,7 @@ describe("StreamingPipeline Integration - Complex Transformations", () => {
       variants: string[];
     }
 
+    // biome-ignore lint/correctness/noUnusedVariables: Type definition for documentation/future use
     interface FlatProduct {
       category: string;
       product: string;
@@ -361,27 +370,25 @@ describe("StreamingPipeline Integration - Complex Transformations", () => {
       },
       {
         name: "Books",
-        products: [
-          { name: "Fiction", variants: ["Hardcover", "Paperback"] },
-        ],
+        products: [{ name: "Fiction", variants: ["Hardcover", "Paperback"] }],
       },
     ];
 
     const pipeline = StreamingPipeline.start<Category>()
-      .flatMap("products", (cat) => cat.products.map(p => ({ category: cat.name, product: p })))
+      .flatMap("products", (cat) => cat.products.map((p) => ({ category: cat.name, product: p })))
       .flatMap("variants", ({ category, product }) =>
-        product.variants.map(v => ({
+        product.variants.map((v) => ({
           category,
           product: product.name,
           variant: v,
-        }))
+        })),
       );
 
     const results = await pipeline.executeToArray(fromArray(categories));
 
     expect(results.length).toBe(6); // 2*2 + 1*2 = 6 variants total
-    expect(results.filter(r => r.category === "Electronics").length).toBe(4);
-    expect(results.filter(r => r.category === "Books").length).toBe(2);
+    expect(results.filter((r) => r.category === "Electronics").length).toBe(4);
+    expect(results.filter((r) => r.category === "Books").length).toBe(2);
   });
 });
 
@@ -406,7 +413,7 @@ describe("StreamingPipeline Integration - Performance", () => {
 
     // Verify correctness
     expect(results[0]).toBeGreaterThan(1000000);
-    expect(results.every(n => n % 4 === 0)).toBe(true); // Squares of evens
+    expect(results.every((n) => n % 4 === 0)).toBe(true); // Squares of evens
   });
 
   test("parallel processing improves throughput", async () => {
@@ -419,16 +426,17 @@ describe("StreamingPipeline Integration - Performance", () => {
 
     // Sequential processing
     const sequentialStart = Date.now();
-    const sequentialPipeline = StreamingPipeline.start<number>()
-      .map("processed", (n) => slowProcess(n));
+    const sequentialPipeline = StreamingPipeline.start<number>().map("processed", (n) => slowProcess(n));
 
     await sequentialPipeline.executeToArray(fromArray(items));
     const sequentialDuration = Date.now() - sequentialStart;
 
     // Parallel processing
     const parallelStart = Date.now();
-    const parallelPipeline = StreamingPipeline.start<number>()
-      .map("processed", (n) => slowProcess(n), { parallel: true, concurrency: 10 });
+    const parallelPipeline = StreamingPipeline.start<number>().map("processed", (n) => slowProcess(n), {
+      parallel: true,
+      concurrency: 10,
+    });
 
     await parallelPipeline.executeToArray(fromArray(items));
     const parallelDuration = Date.now() - parallelStart;
@@ -452,7 +460,9 @@ describe("StreamingPipeline Integration - Memory Efficiency", () => {
     }
 
     const pipeline = StreamingPipeline.start<number>()
-      .tap("track", () => { itemsProcessed++; })
+      .tap("track", () => {
+        itemsProcessed++;
+      })
       .filter("evens", (n) => n % 2 === 0)
       .take("first10", 10); // Only take 10 items
 
@@ -469,18 +479,15 @@ describe("StreamingPipeline Integration - Memory Efficiency", () => {
 
 describe("StreamingPipeline Integration - Custom Steps", () => {
   test("integrates custom streaming steps", async () => {
-    const deduplicateStep = streamingStep<string, string>(
-      "deduplicate",
-      async function* ({ input }) {
-        const seen = new Set<string>();
-        for await (const item of input) {
-          if (!seen.has(item)) {
-            seen.add(item);
-            yield item;
-          }
+    const deduplicateStep = streamingStep<string, string>("deduplicate", async function* ({ input }) {
+      const seen = new Set<string>();
+      for await (const item of input) {
+        if (!seen.has(item)) {
+          seen.add(item);
+          yield item;
         }
       }
-    );
+    });
 
     const pipeline = StreamingPipeline.start<string>()
       .add("deduped", deduplicateStep)
@@ -492,25 +499,22 @@ describe("StreamingPipeline Integration - Custom Steps", () => {
   });
 
   test("combines custom steps with built-in operations", async () => {
-    const windowAverageStep = streamingStep<number, number>(
-      "windowAverage",
-      async function* ({ input }) {
-        const window: number[] = [];
-        const windowSize = 3;
+    const windowAverageStep = streamingStep<number, number>("windowAverage", async function* ({ input }) {
+      const window: number[] = [];
+      const windowSize = 3;
 
-        for await (const item of input) {
-          window.push(item);
-          if (window.length > windowSize) {
-            window.shift();
-          }
+      for await (const item of input) {
+        window.push(item);
+        if (window.length > windowSize) {
+          window.shift();
+        }
 
-          if (window.length === windowSize) {
-            const avg = window.reduce((a, b) => a + b, 0) / windowSize;
-            yield avg;
-          }
+        if (window.length === windowSize) {
+          const avg = window.reduce((a, b) => a + b, 0) / windowSize;
+          yield avg;
         }
       }
-    );
+    });
 
     const pipeline = StreamingPipeline.start<number>()
       .add("averaged", windowAverageStep)
@@ -534,8 +538,7 @@ describe("StreamingPipeline Integration - Terminal Operations", () => {
       max: number;
     }
 
-    const pipeline = StreamingPipeline.start<number>()
-      .filter("positive", (n) => n > 0);
+    const pipeline = StreamingPipeline.start<number>().filter("positive", (n) => n > 0);
 
     const items = [-5, 3, -2, 7, 1, -1, 9, 4];
 
@@ -547,7 +550,7 @@ describe("StreamingPipeline Integration - Terminal Operations", () => {
         min: Math.min(acc.min, n),
         max: Math.max(acc.max, n),
       }),
-      { count: 0, sum: 0, min: Number.POSITIVE_INFINITY, max: Number.NEGATIVE_INFINITY } as Stats
+      { count: 0, sum: 0, min: Number.POSITIVE_INFINITY, max: Number.NEGATIVE_INFINITY } as Stats,
     );
 
     expect(stats.count).toBe(5);
@@ -558,12 +561,11 @@ describe("StreamingPipeline Integration - Terminal Operations", () => {
 
   test("forEach processes all items", async () => {
     const processed: number[] = [];
-    const errors: string[] = [];
+    const _errors: string[] = [];
 
-    const pipeline = StreamingPipeline.start<number>()
-      .map("doubled", (n) => n * 2);
+    const pipeline = StreamingPipeline.start<number>().map("doubled", (n) => n * 2);
 
-    await pipeline.forEach(fromArray([1, 2, 3, 4, 5]), (item, index) => {
+    await pipeline.forEach(fromArray([1, 2, 3, 4, 5]), (item, _index) => {
       if (item > 5) {
         processed.push(item);
       }

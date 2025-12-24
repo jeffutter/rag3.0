@@ -7,10 +7,7 @@ import { readFileForEmbedStep } from "../steps/io/read-file-for-embed";
 import { createAddEOTToChunkStep } from "../steps/utilities/add-eot-to-chunk";
 import { createCleanMarkdownForEmbedStep } from "../steps/utilities/clean-markdown-for-embed";
 import { extractFilesStep } from "../steps/utilities/extract-files";
-import type {
-  EmbeddedDocument,
-  EmbedDocumentsOutput as FormattedOutput,
-} from "../steps/utilities/format-embed-output-final";
+import type { EmbeddedDocument } from "../steps/utilities/format-embed-output-final";
 import { formatEmbedOutputFinalStep } from "../steps/utilities/format-embed-output-final";
 import { createSplitMarkdownForEmbedStep } from "../steps/utilities/split-markdown-for-embed";
 

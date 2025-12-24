@@ -45,7 +45,12 @@
       "Bash(timeout 10 bun run:*)",
       "Bash(timeout 5 bun run:*)",
       "Bash(jj log:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(CONFIG_FILE=config.json LOG_LEVEL=debug LLM_MODEL=qwen3-vl bun start:*)",
+      "Bash(tee:*)",
+      "Bash(CONFIG_FILE=config.json LOG_LEVEL=debug LLM_MODEL=qwen3-vl timeout 60 bun start:*)",
+      "WebFetch(domain:api.qdrant.tech)",
+      "WebFetch(domain:qdrant.tech)"
     ],
     "deny": [],
     "ask": []

@@ -78,6 +78,7 @@ import { StreamingErrorStrategy } from "./streaming-types";
 export function createStreamingStep<
   TInput,
   TOutput,
+  // biome-ignore lint/suspicious/noExplicitAny: Generic constraint requires any to allow flexible accumulated state types
   TAccumulated extends Record<string, any> = Record<string, never>,
   TContext = unknown,
 >(
@@ -116,7 +117,13 @@ export function createStreamingStep<
  *   retryableErrors: ["ETIMEDOUT", "RATE_LIMIT"],
  * });
  */
-export function withRetry<TInput, TOutput, TAccumulated extends Record<string, any>, TContext>(
+export function withRetry<
+  TInput,
+  TOutput,
+  // biome-ignore lint/suspicious/noExplicitAny: Generic constraint requires any to allow flexible accumulated state types
+  TAccumulated extends Record<string, any>,
+  TContext,
+>(
   step: StreamingStep<TInput, TOutput, TAccumulated, TContext>,
   retryConfig: {
     maxAttempts: number;
@@ -147,7 +154,13 @@ export function withRetry<TInput, TOutput, TAccumulated extends Record<string, a
  *   StreamingErrorStrategy.SKIP_FAILED
  * );
  */
-export function withErrorHandling<TInput, TOutput, TAccumulated extends Record<string, any>, TContext>(
+export function withErrorHandling<
+  TInput,
+  TOutput,
+  // biome-ignore lint/suspicious/noExplicitAny: Generic constraint requires any to allow flexible accumulated state types
+  TAccumulated extends Record<string, any>,
+  TContext,
+>(
   step: StreamingStep<TInput, TOutput, TAccumulated, TContext>,
   strategy: StreamingErrorStrategy,
 ): StreamingStep<TInput, TOutput, TAccumulated, TContext> {
@@ -199,7 +212,11 @@ export function withErrorHandling<TInput, TOutput, TAccumulated extends Record<s
  *   (n) => n % 2 === 0
  * );
  */
-export function createStreamingFilter<TInput, TAccumulated extends Record<string, any> = Record<string, never>>(
+export function createStreamingFilter<
+  TInput,
+  // biome-ignore lint/suspicious/noExplicitAny: Generic constraint requires any to allow flexible accumulated state types
+  TAccumulated extends Record<string, any> = Record<string, never>,
+>(
   name: string,
   predicate: (item: TInput, index: number) => boolean | Promise<boolean>,
 ): StreamingStep<TInput, TInput, TAccumulated, unknown> {
@@ -229,7 +246,12 @@ export function createStreamingFilter<TInput, TAccumulated extends Record<string
  *   (n) => n * 2
  * );
  */
-export function createStreamingMap<TInput, TOutput, TAccumulated extends Record<string, any> = Record<string, never>>(
+export function createStreamingMap<
+  TInput,
+  TOutput,
+  // biome-ignore lint/suspicious/noExplicitAny: Generic constraint requires any to allow flexible accumulated state types
+  TAccumulated extends Record<string, any> = Record<string, never>,
+>(
   name: string,
   mapper: (item: TInput, index: number) => TOutput | Promise<TOutput>,
 ): StreamingStep<TInput, TOutput, TAccumulated, unknown> {
@@ -253,10 +275,11 @@ export function createStreamingMap<TInput, TOutput, TAccumulated extends Record<
  * @example
  * const takeFirst10 = createStreamingTake("takeFirst10", 10);
  */
-export function createStreamingTake<TInput, TAccumulated extends Record<string, any> = Record<string, never>>(
-  name: string,
-  count: number,
-): StreamingStep<TInput, TInput, TAccumulated, unknown> {
+export function createStreamingTake<
+  TInput,
+  // biome-ignore lint/suspicious/noExplicitAny: Generic constraint requires any to allow flexible accumulated state types
+  TAccumulated extends Record<string, any> = Record<string, never>,
+>(name: string, count: number): StreamingStep<TInput, TInput, TAccumulated, unknown> {
   return createStreamingStep<TInput, TInput, TAccumulated, unknown>(name, async function* ({ input }) {
     let taken = 0;
     for await (const item of input) {
@@ -280,10 +303,11 @@ export function createStreamingTake<TInput, TAccumulated extends Record<string, 
  * @example
  * const skipFirst20 = createStreamingSkip("skipFirst20", 20);
  */
-export function createStreamingSkip<TInput, TAccumulated extends Record<string, any> = Record<string, never>>(
-  name: string,
-  count: number,
-): StreamingStep<TInput, TInput, TAccumulated, unknown> {
+export function createStreamingSkip<
+  TInput,
+  // biome-ignore lint/suspicious/noExplicitAny: Generic constraint requires any to allow flexible accumulated state types
+  TAccumulated extends Record<string, any> = Record<string, never>,
+>(name: string, count: number): StreamingStep<TInput, TInput, TAccumulated, unknown> {
   return createStreamingStep<TInput, TInput, TAccumulated, unknown>(name, async function* ({ input }) {
     let skipped = 0;
     for await (const item of input) {
@@ -307,10 +331,11 @@ export function createStreamingSkip<TInput, TAccumulated extends Record<string, 
  * @example
  * const batch10 = createStreamingBatch("batch10", 10);
  */
-export function createStreamingBatch<TInput, TAccumulated extends Record<string, any> = Record<string, never>>(
-  name: string,
-  size: number,
-): StreamingStep<TInput, TInput[], TAccumulated, unknown> {
+export function createStreamingBatch<
+  TInput,
+  // biome-ignore lint/suspicious/noExplicitAny: Generic constraint requires any to allow flexible accumulated state types
+  TAccumulated extends Record<string, any> = Record<string, never>,
+>(name: string, size: number): StreamingStep<TInput, TInput[], TAccumulated, unknown> {
   return createStreamingStep<TInput, TInput[], TAccumulated, unknown>(name, async function* ({ input }) {
     let batch: TInput[] = [];
 
@@ -340,9 +365,11 @@ export function createStreamingBatch<TInput, TAccumulated extends Record<string,
  * @example
  * const unbatch = createStreamingUnbatch("unbatch");
  */
-export function createStreamingUnbatch<TElement, TAccumulated extends Record<string, any> = Record<string, never>>(
-  name: string,
-): StreamingStep<TElement[], TElement, TAccumulated, unknown> {
+export function createStreamingUnbatch<
+  TElement,
+  // biome-ignore lint/suspicious/noExplicitAny: Generic constraint requires any to allow flexible accumulated state types
+  TAccumulated extends Record<string, any> = Record<string, never>,
+>(name: string): StreamingStep<TElement[], TElement, TAccumulated, unknown> {
   return createStreamingStep<TElement[], TElement, TAccumulated, unknown>(name, async function* ({ input }) {
     for await (const batch of input) {
       for (const item of batch) {
@@ -381,6 +408,7 @@ export function createStreamingError(
   let code = "STREAM_ERROR";
 
   if (error instanceof Error && "code" in error) {
+    // biome-ignore lint/suspicious/noExplicitAny: Type assertion needed to access code property after runtime check
     code = String((error as any).code);
   }
 

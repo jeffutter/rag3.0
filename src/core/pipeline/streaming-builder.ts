@@ -52,10 +52,10 @@ import type {
   StreamingStepFn,
 } from "./streaming/types";
 import { bufferTime, window } from "./streaming/windowing";
-import { arrayToGenerator, collectStream, StreamingStateImpl } from "./streaming-state";
+import { StreamingStateImpl } from "./streaming-state";
 import type { StreamingStep, StreamingStepContext } from "./streaming-types";
 
-const logger = createLogger("streaming-pipeline");
+const _logger = createLogger("streaming-pipeline");
 
 /**
  * Options for map operations in the streaming pipeline.

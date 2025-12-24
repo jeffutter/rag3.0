@@ -107,14 +107,14 @@ Be concise but thorough in your responses.
 
 Current date and time: ${currentDateTime}
 `,
-//       systemPrompt: `You are a helpful assistant with access to a personal knowledge base.
-//
-// When asked a question:
-// 1. Use the search_knowledge_base tool to find relevant information
-// 2. Synthesize the information into a clear, helpful response
-// 3. Cite sources when relevant
-//
-// Be concise but thorough in your responses.`,
+      //       systemPrompt: `You are a helpful assistant with access to a personal knowledge base.
+      //
+      // When asked a question:
+      // 1. Use the search_knowledge_base tool to find relevant information
+      // 2. Synthesize the information into a clear, helpful response
+      // 3. Cite sources when relevant
+      //
+      // Be concise but thorough in your responses.`,
     });
 
     logger.info({ event: "shutdown_complete" });

@@ -58,17 +58,37 @@ export class VectorSearchClient {
     try {
       // biome-ignore lint/suspicious/noExplicitAny: Qdrant client doesn't export query params type
       const queryParams: any = {
-        query: vector, // Always use vector as the query for similarity search
         limit: options.limit || 10,
         with_payload: options.withPayload ?? true,
       };
 
-      if (options.scoreThreshold != null) {
-        queryParams.score_threshold = options.scoreThreshold;
+      // Check if filter has score modifier structure (mult with $score)
+      const hasScoreModifier =
+        options.filter &&
+        typeof options.filter === "object" &&
+        "mult" in options.filter &&
+        Array.isArray(options.filter.mult) &&
+        options.filter.mult[0] === "$score";
+
+      if (hasScoreModifier) {
+        // Use prefetch for vector search, then rescore with formula
+        queryParams.prefetch = {
+          query: vector,
+          limit: (options.limit || 10) * 2, // Prefetch more for better rescoring
+        };
+        queryParams.query = {
+          formula: options.filter,
+        };
+      } else {
+        // Use vector directly as query
+        queryParams.query = vector;
+        if (options.filter != null) {
+          queryParams.filter = options.filter;
+        }
       }
 
-      if (options.filter != null) {
-        queryParams.filter = options.filter;
+      if (options.scoreThreshold != null) {
+        queryParams.score_threshold = options.scoreThreshold;
       }
 
       logger.debug({
@@ -84,7 +104,31 @@ export class VectorSearchClient {
         },
       });
 
-      const results = await this.client.query(options.collection, queryParams);
+      logger.debug({
+        event: "qdrant_query_full_request",
+        collection: options.collection,
+        fullParams: JSON.stringify(queryParams, null, 2),
+      });
+
+      let results: Awaited<ReturnType<typeof this.client.query>>;
+      try {
+        results = await this.client.query(options.collection, queryParams);
+
+        logger.debug({
+          event: "qdrant_query_raw_response",
+          collection: options.collection,
+          rawResponse: JSON.stringify(results, null, 2),
+        });
+      } catch (error) {
+        logger.error({
+          event: "qdrant_query_api_error",
+          collection: options.collection,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          queryParams: JSON.stringify(queryParams, null, 2),
+        });
+        throw error;
+      }
 
       const durationMs = performance.now() - startTime;
 
