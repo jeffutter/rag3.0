@@ -104,11 +104,7 @@ export async function loadConfig(path?: string): Promise<Config> {
   }
 
   // Embedding overrides
-  if (
-    process.env.EMBEDDING_BASE_URL ||
-    process.env.EMBEDDING_MODEL ||
-    process.env.EMBEDDING_API_KEY
-  ) {
+  if (process.env.EMBEDDING_BASE_URL || process.env.EMBEDDING_MODEL || process.env.EMBEDDING_API_KEY) {
     envConfig.embedding = {
       ...(typeof fileConfig === "object" && fileConfig !== null && "embedding" in fileConfig
         ? (fileConfig.embedding as Record<string, unknown>)

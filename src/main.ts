@@ -74,6 +74,8 @@ async function main() {
       baseURL: string;
       model?: string;
       apiKey?: string;
+      useInstructions?: boolean;
+      instructions?: string;
     } = {
       baseURL: config.reranker.baseURL,
     };
@@ -84,6 +86,14 @@ async function main() {
 
     if (config.reranker.apiKey) {
       rerankConfig.apiKey = config.reranker.apiKey;
+    }
+
+    if (config.reranker.useInstructions !== undefined) {
+      rerankConfig.useInstructions = config.reranker.useInstructions;
+    }
+
+    if (config.reranker.instructions) {
+      rerankConfig.instructions = config.reranker.instructions;
     }
 
     // Initialize Obsidian Vault Utility client
@@ -117,6 +127,15 @@ async function main() {
       tools: toolRegistry.getAll(),
       model: config.llm.model,
       systemPrompt: `You are an expert in calling tool functions. You will receive a problem and a set of possible tool functions. Based on the problem, you need to make one or more function/tool calls to achieve the goal. Please try to explore solving the problem using the available tools.
+
+When interpreting temporal language in queries:
+- "recently" or "lately" = last 7-14 days (use start_date_time)
+- "this week" = start of current week to now
+- "last week" = previous week's Monday to Sunday
+- "this month" = start of current month to now
+- "last month" = previous month's full range
+Always set end_date_time to the current time for ongoing periods ("recently", "this month", etc.).
+
 If no function can be used, please respond to the user directly using natural language.
 If the given problem lacks the parameters required by the function, please ask the user for the necessary information using natural language.
 If the call results are sufficient to answer the user's question, please summarize the historical results and respond to the user using natural language.

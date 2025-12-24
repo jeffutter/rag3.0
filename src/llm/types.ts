@@ -29,12 +29,22 @@ export interface AssistantMessage extends Message {
   toolCalls?: ToolCall[];
 }
 
+// Tool example for few-shot learning
+export interface ToolExample {
+  description: string; // What the example demonstrates
+  input: string; // User query/input
+  toolCall: {
+    arguments: Record<string, unknown>; // The tool arguments that should be used
+  };
+}
+
 // Tool definition
 export interface ToolDefinition<TArgs = unknown> {
   name: string;
   description: string;
   parameters: z.ZodType<TArgs>;
   execute: (args: TArgs) => Promise<unknown>;
+  examples?: ToolExample[]; // Optional few-shot examples
 }
 
 // Completion options

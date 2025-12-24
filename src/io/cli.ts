@@ -4,6 +4,31 @@ import type { LLMClient, ToolDefinition } from "../llm/types";
 
 const logger = createLogger("cli");
 
+/**
+ * Builds an enhanced system prompt by appending tool examples if available.
+ */
+function buildSystemPromptWithExamples(basePrompt: string, tools: ToolDefinition[]): string {
+  const toolsWithExamples = tools.filter((tool) => tool.examples && tool.examples.length > 0);
+
+  if (toolsWithExamples.length === 0) {
+    return basePrompt;
+  }
+
+  const examplesSection = toolsWithExamples
+    .map((tool) => {
+      const examples = tool.examples
+        ?.map(
+          (ex) =>
+            `  - ${ex.description}\n    Input: "${ex.input}"\n    Tool call: ${tool.name}(${JSON.stringify(ex.toolCall.arguments)})`,
+        )
+        .join("\n");
+      return `Tool: ${tool.name}\n${examples}`;
+    })
+    .join("\n\n");
+
+  return `${basePrompt}\n\nTool Usage Examples:\n${examplesSection}`;
+}
+
 export interface CLIOptions {
   llmClient: LLMClient;
   tools: ToolDefinition[];
@@ -33,9 +58,11 @@ export async function runCLI(options: CLIOptions) {
     process.env.LOG_LEVEL = "debug";
   }
 
-  const systemPrompt =
+  const baseSystemPrompt =
     options.systemPrompt ||
     `You are a helpful assistant with access to a knowledge base. Use the available tools to answer user questions accurately.`;
+
+  const systemPrompt = buildSystemPromptWithExamples(baseSystemPrompt, options.tools);
 
   if (values.query && typeof values.query === "string") {
     // Single query mode with -q flag

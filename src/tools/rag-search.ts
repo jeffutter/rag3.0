@@ -4,6 +4,7 @@ import { generateEmbeddings } from "../lib/embeddings";
 import { processDateRange } from "../lib/gaussian-decay";
 import type { ObsidianVaultUtilityClient } from "../lib/obsidian-vault-utility-client";
 import { type RerankConfig, rerankDocuments } from "../lib/reranker";
+import type { ToolExample } from "../llm/types";
 import type { EmbeddingConfig } from "../retrieval/embedding";
 import type { SearchResult, VectorSearchClient } from "../retrieval/qdrant-client";
 import { defineTool } from "./registry";
@@ -45,18 +46,88 @@ function createSearchArgsSchema(availableTags: string[]) {
       .string()
       .optional()
       .describe(
-        "Optional RFC3339 formatted start date/time. Results will be boosted based on their timestamp proximity to the date range using gaussian decay.",
+        "Start date/time in RFC3339 format (e.g., '2024-01-01T00:00:00Z'). " +
+          "Use this for temporal queries: 'recently' = last 7 days, 'lately' = last 14 days, " +
+          "'this week' = start of current week, 'last month' = start of previous month. " +
+          "Results are boosted based on proximity to the date range using gaussian decay.",
       ),
     end_date_time: z
       .string()
       .optional()
       .describe(
-        "Optional RFC3339 formatted end date/time. Results will be boosted based on their timestamp proximity to the date range using gaussian decay.",
+        "End date/time in RFC3339 format (e.g., '2024-12-31T23:59:59Z'). " +
+          "For queries like 'recently' or 'lately', set to current time. " +
+          "Results are boosted based on proximity to the date range using gaussian decay.",
       ),
   });
 }
 
 type SearchArgs = z.infer<ReturnType<typeof createSearchArgsSchema>>;
+
+/**
+ * Generates temporal query examples with dynamic dates based on current time.
+ */
+function createTemporalExamples(): ToolExample[] {
+  const now = new Date();
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+  // Calculate start of current week (Monday)
+  const currentDayOfWeek = now.getDay();
+  const daysFromMonday = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1; // Sunday is 0
+  const startOfWeek = new Date(now.getTime() - daysFromMonday * 24 * 60 * 60 * 1000);
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  // Calculate start of current month
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  return [
+    {
+      description: "Searching for recent journal entries (last 7 days)",
+      input: "What have I journaled about recently?",
+      toolCall: {
+        arguments: {
+          query: "journal entries",
+          start_date_time: sevenDaysAgo.toISOString(),
+          end_date_time: now.toISOString(),
+        },
+      },
+    },
+    {
+      description: "Searching for notes from the past two weeks",
+      input: "What notes have I taken lately?",
+      toolCall: {
+        arguments: {
+          query: "notes",
+          start_date_time: fourteenDaysAgo.toISOString(),
+          end_date_time: now.toISOString(),
+        },
+      },
+    },
+    {
+      description: "Searching for work items from this week",
+      input: "What work items did I track this week?",
+      toolCall: {
+        arguments: {
+          query: "work items",
+          start_date_time: startOfWeek.toISOString(),
+          end_date_time: now.toISOString(),
+        },
+      },
+    },
+    {
+      description: "Searching for meetings this month",
+      input: "What meetings have I had this month?",
+      toolCall: {
+        arguments: {
+          query: "meetings",
+          start_date_time: startOfMonth.toISOString(),
+          end_date_time: now.toISOString(),
+        },
+      },
+    },
+  ];
+}
 
 export async function createRAGSearchTool(context: RAGSearchContext) {
   // Fetch available tags dynamically
@@ -68,8 +139,10 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
   return defineTool({
     name: "search_knowledge_base",
     description:
-      "Search the knowledge base for relevant documents and notes. Use this to find information related to a user query.",
+      "Search the knowledge base for relevant documents and notes. Use this to find information related to a user query. " +
+      "For time-sensitive queries (e.g., 'recently', 'last week', 'this month'), use start_date_time and/or end_date_time to boost results by temporal relevance.",
     parameters: searchArgsSchema,
+    examples: createTemporalExamples(),
     execute: async (args: SearchArgs): Promise<SearchResult[]> => {
       logger.info({
         event: "rag_search_start",

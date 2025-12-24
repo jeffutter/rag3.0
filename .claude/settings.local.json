@@ -50,13 +50,16 @@
       "Bash(tee:*)",
       "Bash(CONFIG_FILE=config.json LOG_LEVEL=debug LLM_MODEL=qwen3-vl timeout 60 bun start:*)",
       "WebFetch(domain:api.qdrant.tech)",
-      "WebFetch(domain:qdrant.tech)"
+      "WebFetch(domain:qdrant.tech)",
+      "Bash(timeout 60 bash -c:*)"
     ],
     "deny": [],
     "ask": []
   },
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": ["backlog"],
+  "enabledMcpjsonServers": [
+    "backlog"
+  ],
   "hooks": {
     "PostToolUse": [
       {
