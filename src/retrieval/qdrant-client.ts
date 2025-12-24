@@ -56,43 +56,43 @@ export class VectorSearchClient {
     });
 
     try {
-      // biome-ignore lint/suspicious/noExplicitAny: Qdrant client doesn't export search params type
-      const searchParams: any = {
-        vector,
+      // biome-ignore lint/suspicious/noExplicitAny: Qdrant client doesn't export query params type
+      const queryParams: any = {
+        query: vector, // Always use vector as the query for similarity search
         limit: options.limit || 10,
         with_payload: options.withPayload ?? true,
       };
 
       if (options.scoreThreshold != null) {
-        searchParams.score_threshold = options.scoreThreshold;
+        queryParams.score_threshold = options.scoreThreshold;
       }
 
       if (options.filter != null) {
-        searchParams.filter = options.filter;
+        queryParams.filter = options.filter;
       }
 
       logger.debug({
-        event: "qdrant_search_request",
+        event: "qdrant_query_request",
         collection: options.collection,
         params: {
           vectorDim: vector.length,
           vectorPreview: vector.slice(0, 5),
-          limit: searchParams.limit,
-          scoreThreshold: searchParams.score_threshold,
-          filter: searchParams.filter,
-          withPayload: searchParams.with_payload,
+          limit: queryParams.limit,
+          scoreThreshold: queryParams.score_threshold,
+          filter: queryParams.filter,
+          withPayload: queryParams.with_payload,
         },
       });
 
-      const results = await this.client.search(options.collection, searchParams);
+      const results = await this.client.query(options.collection, queryParams);
 
       const durationMs = performance.now() - startTime;
 
       logger.debug({
-        event: "qdrant_search_response",
+        event: "qdrant_query_response",
         collection: options.collection,
-        resultCount: results.length,
-        results: results.map((r) => ({
+        resultCount: results.points.length,
+        results: results.points.map((r) => ({
           id: r.id,
           score: r.score,
           hasPayload: !!r.payload,
@@ -101,21 +101,21 @@ export class VectorSearchClient {
       });
 
       logger.info({
-        event: "vector_search_complete",
+        event: "vector_query_complete",
         collection: options.collection,
-        resultCount: results.length,
+        resultCount: results.points.length,
         durationMs,
-        topScore: results[0]?.score,
+        topScore: results.points[0]?.score,
       });
 
-      return results.map((r) => ({
+      return results.points.map((r) => ({
         id: r.id,
         score: r.score,
         payload: r.payload as Record<string, unknown>,
       }));
     } catch (error) {
       logger.error({
-        event: "vector_search_error",
+        event: "vector_query_error",
         collection: options.collection,
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
@@ -127,48 +127,12 @@ export class VectorSearchClient {
   async searchWithMetadataFilter(
     vector: number[],
     collection: string,
-    filters: {
-      must?: Array<{
-        key: string;
-        match: { value: string | number | boolean };
-      }>;
-      should?: Array<{
-        key: string;
-        match: { value: string | number | boolean };
-      }>;
-      mustNot?: Array<{
-        key: string;
-        match: { value: string | number | boolean };
-      }>;
-    },
+    filter?: QdrantFilter,
     options?: {
       limit?: number;
       scoreThreshold?: number;
     },
   ): Promise<SearchResult[]> {
-    const filter: QdrantFilter = {};
-
-    if (filters.must?.length) {
-      filter.must = filters.must.map((f) => ({
-        key: f.key,
-        match: f.match,
-      }));
-    }
-
-    if (filters.should?.length) {
-      filter.should = filters.should.map((f) => ({
-        key: f.key,
-        match: f.match,
-      }));
-    }
-
-    if (filters.mustNot?.length) {
-      filter.must_not = filters.mustNot.map((f) => ({
-        key: f.key,
-        match: f.match,
-      }));
-    }
-
     const searchOptions: Omit<SearchOptions, "query"> = {
       collection,
       filter,

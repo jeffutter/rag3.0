@@ -93,6 +93,7 @@ async function main() {
     });
 
     // Run CLI
+    const currentDateTime = new Date().toISOString(); // RFC3339 format
     await runCLI({
       llmClient,
       tools: toolRegistry.getAll(),
@@ -102,7 +103,10 @@ If no function can be used, please respond to the user directly using natural la
 If the given problem lacks the parameters required by the function, please ask the user for the necessary information using natural language.
 If the call results are sufficient to answer the user's question, please summarize the historical results and respond to the user using natural language.
 Cite sources when relevant
-Be concise but thorough in your responses.`,
+Be concise but thorough in your responses.
+
+Current date and time: ${currentDateTime}
+`,
 //       systemPrompt: `You are a helpful assistant with access to a personal knowledge base.
 //
 // When asked a question:
