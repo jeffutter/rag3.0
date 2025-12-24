@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createLogger } from "../core/logging/logger";
+import { generateEmbeddings } from "../lib/embeddings";
 import type { ObsidianVaultUtilityClient } from "../lib/obsidian-vault-utility-client";
 import type { EmbeddingConfig } from "../retrieval/embedding";
 import type { SearchResult, VectorSearchClient } from "../retrieval/qdrant-client";
@@ -66,10 +67,6 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
 
       // Generate embedding for query
       const embeddingUrl = `${context.embeddingConfig.baseURL}/embeddings`;
-      const embeddingRequestBody = {
-        model: context.embeddingConfig.model,
-        input: args.query,
-      };
 
       logger.debug({
         event: "embedding_http_request",
@@ -81,56 +78,29 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
         hasApiKey: !!context.embeddingConfig.apiKey,
       });
 
-      const embeddingResponse = await fetch(embeddingUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(context.embeddingConfig.apiKey && {
-            Authorization: `Bearer ${context.embeddingConfig.apiKey}`,
-          }),
-        },
-        body: JSON.stringify(embeddingRequestBody),
-      });
-
-      logger.debug({
-        event: "embedding_http_response",
-        status: embeddingResponse.status,
-        statusText: embeddingResponse.statusText,
-        contentType: embeddingResponse.headers.get("content-type"),
-      });
-
-      if (!embeddingResponse.ok) {
-        const errorText = await embeddingResponse.text();
-        logger.error({
-          event: "embedding_error",
-          status: embeddingResponse.status,
-          statusText: embeddingResponse.statusText,
-          errorBody: errorText,
-        });
-        throw new Error(`Embedding generation failed: ${embeddingResponse.statusText} - ${errorText}`);
-      }
-
-      const embeddingData = (await embeddingResponse.json()) as {
-        data: Array<{ embedding: number[] }>;
-      };
+      const embeddingResults = await generateEmbeddings(
+        [args.query],
+        embeddingUrl,
+        context.embeddingConfig.model,
+        context.embeddingConfig.apiKey,
+      );
 
       logger.debug({
         event: "embedding_parsed",
-        hasData: !!embeddingData.data,
-        dataCount: embeddingData.data?.length,
-        embeddingDimension: embeddingData.data[0]?.embedding?.length,
-        firstFewValues: embeddingData.data[0]?.embedding?.slice(0, 5),
+        dataCount: embeddingResults.length,
+        embeddingDimension: embeddingResults[0]?.embedding?.length,
+        firstFewValues: embeddingResults[0]?.embedding?.slice(0, 5),
       });
 
-      if (!embeddingData.data[0]) {
+      if (!embeddingResults[0]) {
         logger.error({
           event: "embedding_missing_data",
-          response: embeddingData,
+          resultCount: embeddingResults.length,
         });
         throw new Error("No embedding data returned from API");
       }
 
-      const embedding = embeddingData.data[0].embedding;
+      const embedding = embeddingResults[0].embedding;
 
       // Search with optional tag filter
       const filters = args.tags?.length

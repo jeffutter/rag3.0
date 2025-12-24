@@ -41,10 +41,12 @@ export interface EmbeddingResult {
  * - Response validation using Zod schemas
  * - Proper ordering of results (sorting by index if provided)
  * - Verification that the number of embeddings matches the number of inputs
+ * - Optional API key authentication
  *
  * @param contents - Array of text strings to generate embeddings for (must have at least one element)
  * @param endpoint - URL of the OpenAI-compatible embeddings API endpoint
  * @param model - Model identifier to use for generating embeddings
+ * @param apiKey - Optional API key for authentication (added as Bearer token)
  * @returns Promise that resolves to an array of embedding results in the same order as the input contents
  * @throws {Error} When the API returns a non-OK status
  * @throws {Error} When the API response doesn't match the expected schema
@@ -64,6 +66,7 @@ export async function generateEmbeddings(
   contents: string[],
   endpoint: string,
   model: string,
+  apiKey?: string,
 ): Promise<EmbeddingResult[]> {
   // Prepare request body
   const requestBody = EmbeddingRequestSchema.parse({
@@ -76,6 +79,7 @@ export async function generateEmbeddings(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...(apiKey && { Authorization: `Bearer ${apiKey}` }),
     },
     body: JSON.stringify(requestBody),
   });
