@@ -69,6 +69,23 @@ async function main() {
       embeddingConfig.apiKey = config.embedding.apiKey;
     }
 
+    // Initialize reranker config
+    const rerankConfig: {
+      baseURL: string;
+      model?: string;
+      apiKey?: string;
+    } = {
+      baseURL: config.reranker.baseURL,
+    };
+
+    if (config.reranker.model) {
+      rerankConfig.model = config.reranker.model;
+    }
+
+    if (config.reranker.apiKey) {
+      rerankConfig.apiKey = config.reranker.apiKey;
+    }
+
     // Initialize Obsidian Vault Utility client
     const vaultClient = createObsidianVaultUtilityClient({
       baseURL: config.vault.baseURL,
@@ -80,6 +97,7 @@ async function main() {
     const ragSearchTool = await createRAGSearchTool({
       vectorClient,
       embeddingConfig,
+      rerankConfig,
       defaultCollection: config.qdrant.defaultCollection,
       vaultClient,
     });

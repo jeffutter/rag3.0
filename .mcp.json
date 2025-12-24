@@ -3,10 +3,7 @@
     "backlog": {
       "type": "stdio",
       "command": "backlog",
-      "args": [
-        "mcp",
-        "start"
-      ],
+      "args": ["mcp", "start"],
       "env": {}
     }
   }

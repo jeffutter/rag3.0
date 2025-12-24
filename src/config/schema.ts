@@ -21,6 +21,14 @@ export const configSchema = z.object({
     apiKey: z.string().optional(),
   }),
 
+  reranker: z.object({
+    baseURL: z.string(),
+    model: z.string().optional(),
+    apiKey: z.string().optional(),
+    useInstructions: z.boolean().optional().default(false),
+    instructions: z.string().optional(),
+  }),
+
   qdrant: z.object({
     url: z.string(),
     apiKey: z.string().optional(),
@@ -96,7 +104,11 @@ export async function loadConfig(path?: string): Promise<Config> {
   }
 
   // Embedding overrides
-  if (process.env.EMBEDDING_BASE_URL || process.env.EMBEDDING_MODEL || process.env.EMBEDDING_API_KEY) {
+  if (
+    process.env.EMBEDDING_BASE_URL ||
+    process.env.EMBEDDING_MODEL ||
+    process.env.EMBEDDING_API_KEY
+  ) {
     envConfig.embedding = {
       ...(typeof fileConfig === "object" && fileConfig !== null && "embedding" in fileConfig
         ? (fileConfig.embedding as Record<string, unknown>)
@@ -104,6 +116,28 @@ export async function loadConfig(path?: string): Promise<Config> {
       ...(process.env.EMBEDDING_BASE_URL ? { baseURL: process.env.EMBEDDING_BASE_URL } : {}),
       ...(process.env.EMBEDDING_MODEL ? { model: process.env.EMBEDDING_MODEL } : {}),
       ...(process.env.EMBEDDING_API_KEY ? { apiKey: process.env.EMBEDDING_API_KEY } : {}),
+    };
+  }
+
+  // Reranker overrides
+  if (
+    process.env.RERANKER_BASE_URL ||
+    process.env.RERANKER_MODEL ||
+    process.env.RERANKER_API_KEY ||
+    process.env.RERANKER_USE_INSTRUCTIONS ||
+    process.env.RERANKER_INSTRUCTIONS
+  ) {
+    envConfig.reranker = {
+      ...(typeof fileConfig === "object" && fileConfig !== null && "reranker" in fileConfig
+        ? (fileConfig.reranker as Record<string, unknown>)
+        : {}),
+      ...(process.env.RERANKER_BASE_URL ? { baseURL: process.env.RERANKER_BASE_URL } : {}),
+      ...(process.env.RERANKER_MODEL ? { model: process.env.RERANKER_MODEL } : {}),
+      ...(process.env.RERANKER_API_KEY ? { apiKey: process.env.RERANKER_API_KEY } : {}),
+      ...(process.env.RERANKER_USE_INSTRUCTIONS
+        ? { useInstructions: process.env.RERANKER_USE_INSTRUCTIONS === "true" }
+        : {}),
+      ...(process.env.RERANKER_INSTRUCTIONS ? { instructions: process.env.RERANKER_INSTRUCTIONS } : {}),
     };
   }
 

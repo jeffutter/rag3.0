@@ -56,9 +56,7 @@
     "ask": []
   },
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": [
-    "backlog"
-  ],
+  "enabledMcpjsonServers": ["backlog"],
   "hooks": {
     "PostToolUse": [
       {

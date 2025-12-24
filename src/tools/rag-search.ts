@@ -3,6 +3,7 @@ import { createLogger } from "../core/logging/logger";
 import { generateEmbeddings } from "../lib/embeddings";
 import { processDateRange } from "../lib/gaussian-decay";
 import type { ObsidianVaultUtilityClient } from "../lib/obsidian-vault-utility-client";
+import { type RerankConfig, rerankDocuments } from "../lib/reranker";
 import type { EmbeddingConfig } from "../retrieval/embedding";
 import type { SearchResult, VectorSearchClient } from "../retrieval/qdrant-client";
 import { defineTool } from "./registry";
@@ -12,11 +13,13 @@ const logger = createLogger("rag-tool");
 export interface RAGSearchContext {
   vectorClient: VectorSearchClient;
   embeddingConfig: EmbeddingConfig;
+  rerankConfig?: RerankConfig;
   defaultCollection: string;
   vaultClient: ObsidianVaultUtilityClient;
 }
 
 const LIMIT = 20;
+const EMBED_LIMIT_MULTIPLIER = 4;
 
 /**
  * Creates a search arguments schema with dynamically loaded tags
@@ -32,7 +35,7 @@ function createSearchArgsSchema(availableTags: string[]) {
       .min(1)
       .max(20)
       .optional()
-      .default(5)
+      .default(10)
       .describe(`Maximum number of results to return. Must be ${LIMIT} or less`),
     tags: z
       .array(z.string())
@@ -87,6 +90,7 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
         inputText: args.query,
         inputLength: args.query.length,
         hasApiKey: !!context.embeddingConfig.apiKey,
+        originalQuery: args.query,
       });
 
       const embeddingResults = await generateEmbeddings(
@@ -168,7 +172,7 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
         event: "vector_search_params",
         collection: context.defaultCollection,
         embeddingDimension: embedding.length,
-        limit: args.limit,
+        limit: args.limit * EMBED_LIMIT_MULTIPLIER,
         hasFilter: !!filter,
         gaussianParams: gaussianParams,
         tags: args.tags,
@@ -180,12 +184,12 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
         context.defaultCollection,
         filter,
         {
-          limit: args.limit,
+          limit: args.limit * EMBED_LIMIT_MULTIPLIER,
         },
       );
 
       logger.info({
-        event: "rag_search_complete",
+        event: "vector_search_complete",
         resultCount: results.length,
         topScore: results[0]?.score,
         results: results.map((r) => ({
@@ -195,12 +199,88 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
         })),
       });
 
-      logger.debug({
-        event: "rag_search_full_results",
-        results: results,
+      // Apply reranking if configured
+      let finalResults = results;
+      if (context.rerankConfig && results.length > 0) {
+        logger.debug({
+          event: "reranking_start",
+          resultCount: results.length,
+        });
+
+        // Extract document content from results
+        // Assuming the payload has a 'content' field
+        const documents = results.map((r) => {
+          const content = r.payload.content;
+          if (typeof content === "string") {
+            return content;
+          }
+          // Fallback: stringify the entire payload if content is not a string
+          return JSON.stringify(r.payload);
+        });
+
+        try {
+          const rerankResults = await rerankDocuments(args.query, documents, context.rerankConfig, args.limit);
+
+          logger.debug({
+            event: "reranking_complete",
+            rerankResultCount: rerankResults.length,
+            topRerankScore: rerankResults[0]?.relevance_score,
+          });
+
+          // Reorder the original results based on reranker output
+          const rerankedResults: SearchResult[] = [];
+          for (const rerankResult of rerankResults) {
+            const originalResult = results[rerankResult.index];
+            if (!originalResult) {
+              logger.warn({
+                event: "reranking_invalid_index",
+                index: rerankResult.index,
+                totalResults: results.length,
+              });
+              continue;
+            }
+            rerankedResults.push({
+              id: originalResult.id,
+              score: rerankResult.relevance_score,
+              payload: {
+                ...originalResult.payload,
+                vector_score: originalResult.score,
+              },
+            });
+          }
+          finalResults = rerankedResults;
+
+          logger.info({
+            event: "reranking_applied",
+            originalTopScore: results[0]?.score,
+            rerankedTopScore: finalResults[0]?.score,
+          });
+        } catch (error) {
+          logger.error({
+            event: "reranking_failed",
+            error: error instanceof Error ? error.message : String(error),
+          });
+          // Fall back to original results if reranking fails
+          logger.info({
+            event: "reranking_fallback",
+            message: "Using original vector search results due to reranking failure",
+          });
+        }
+      }
+
+      logger.info({
+        event: "rag_search_complete",
+        resultCount: finalResults.length,
+        topScore: finalResults[0]?.score,
+        reranked: !!context.rerankConfig,
       });
 
-      return results;
+      logger.debug({
+        event: "rag_search_full_results",
+        results: finalResults,
+      });
+
+      return finalResults;
     },
   });
 }

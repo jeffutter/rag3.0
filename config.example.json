@@ -1,5 +1,5 @@
 {
-  "$comment": "Environment variables will override any values set in this config file. Available env vars: LLM_BASE_URL, LLM_API_KEY, LLM_MODEL, LLM_TIMEOUT, EMBEDDING_BASE_URL, EMBEDDING_MODEL, EMBEDDING_API_KEY, QDRANT_URL, QDRANT_API_KEY, QDRANT_COLLECTION, VAULT_BASE_URL, SERVER_PORT, SERVER_HOST, LOG_LEVEL, NODE_ENV",
+  "$comment": "Environment variables will override any values set in this config file. Available env vars: LLM_BASE_URL, LLM_API_KEY, LLM_MODEL, LLM_TIMEOUT, EMBEDDING_BASE_URL, EMBEDDING_MODEL, EMBEDDING_API_KEY, EMBEDDING_USE_INSTRUCTIONS, EMBEDDING_INSTRUCTIONS, RERANKER_BASE_URL, RERANKER_MODEL, RERANKER_API_KEY, RERANKER_USE_INSTRUCTIONS, RERANKER_INSTRUCTIONS, QDRANT_URL, QDRANT_API_KEY, QDRANT_COLLECTION, VAULT_BASE_URL, SERVER_PORT, SERVER_HOST, LOG_LEVEL, NODE_ENV",
   "llm": {
     "baseURL": "http://localhost:8080/v1",
     "model": "qwen2.5:7b",
@@ -7,7 +7,12 @@
   },
   "embedding": {
     "baseURL": "http://localhost:8080/v1",
-    "model": "nomic-embed-text"
+    "model": "nomic-embed-text",
+    "useInstructions": false
+  },
+  "reranker": {
+    "baseURL": "http://localhost:8080/v1",
+    "useInstructions": false
   },
   "qdrant": {
     "url": "http://localhost:6333",
