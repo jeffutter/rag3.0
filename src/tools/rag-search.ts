@@ -6,7 +6,7 @@ import type { ObsidianVaultUtilityClient } from "../lib/obsidian-vault-utility-c
 import { type RerankConfig, rerankDocuments } from "../lib/reranker";
 import type { ToolExample } from "../llm/types";
 import type { EmbeddingConfig } from "../retrieval/embedding";
-import type { SearchResult, VectorSearchClient } from "../retrieval/qdrant-client";
+import type { SearchBranch, SearchResult, VectorSearchClient } from "../retrieval/qdrant-client";
 import { defineTool } from "./registry";
 
 const logger = createLogger("rag-tool");
@@ -193,42 +193,103 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
       // Calculate gaussian decay parameters if date range is provided
       const gaussianParams = processDateRange(args.start_date_time, args.end_date_time);
 
-      // Build filter with score modifier combining date range and tag boosts
-      // Structure: multiply base score ($score) with sum of modifiers
-      let filter: unknown;
-
-      if (gaussianParams || args.tags?.length) {
-        const scoreModifierComponents: unknown[] = [1.0]; // Base multiplier
-
-        // Add gaussian decay boost if dates are provided
-        if (gaussianParams) {
-          scoreModifierComponents.push({
-            mult: [
-              1.0, // Weight for gaussian decay
-              {
-                gauss_decay: {
-                  x: { datetime_key: "metadata.modified_timestamp" },
-                  target: { datetime: gaussianParams.target },
-                  scale: gaussianParams.scale,
-                  midpoint: 0.5,
+      // Helper to build gaussian decay component
+      const buildGaussianDecay = () =>
+        gaussianParams
+          ? {
+              mult: [
+                1.0, // Weight for gaussian decay
+                {
+                  gauss_decay: {
+                    x: { datetime_key: "metadata.modified_timestamp" },
+                    target: { datetime: gaussianParams.target },
+                    scale: gaussianParams.scale,
+                    midpoint: 0.5,
+                  },
                 },
-              },
-            ],
-          });
+              ],
+            }
+          : null;
+
+      // Helper to build tag boost components
+      const buildTagBoosts = () =>
+        args.tags?.map((tag) => ({
+          mult: [
+            0.25, // Weight boost per matching tag
+            {
+              key: "tags",
+              match: { value: tag },
+            },
+          ],
+        })) || [];
+
+      // Build hybrid search when tags are provided, otherwise use single search
+      let filter: unknown;
+      let hybridBranches: SearchBranch[] | undefined;
+
+      if (args.tags?.length) {
+        // Branch 1: Vector similarity with tag boosts AND temporal decay
+        const branch1ScoreComponents: unknown[] = [1.0];
+        const gaussianDecay = buildGaussianDecay();
+        if (gaussianDecay) {
+          branch1ScoreComponents.push(gaussianDecay);
+        }
+        branch1ScoreComponents.push(...buildTagBoosts());
+
+        // Branch 2: Tag-focused search with temporal decay
+        const branch2ScoreComponents: unknown[] = [1.0];
+        if (gaussianDecay) {
+          branch2ScoreComponents.push(gaussianDecay);
         }
 
-        // Add tag boosts if tags are provided
-        if (args.tags?.length) {
-          const tagWeights = args.tags.map((tag) => ({
-            mult: [
-              0.25, // Weight boost per matching tag
-              {
-                key: "tags",
-                match: { value: tag },
+        hybridBranches = [
+          {
+            prefetch: {
+              query: embedding,
+              limit: args.limit * EMBED_LIMIT_MULTIPLIER * 2,
+            },
+            query: {
+              formula: {
+                mult: [
+                  "$score",
+                  {
+                    sum: branch1ScoreComponents,
+                  },
+                ],
               },
-            ],
-          }));
-          scoreModifierComponents.push(...tagWeights);
+            },
+            limit: args.limit * EMBED_LIMIT_MULTIPLIER,
+          },
+          {
+            prefetch: {
+              query: embedding,
+              filter: {
+                should: args.tags.map((tag) => ({
+                  key: "tags",
+                  match: { value: tag },
+                })),
+              },
+              limit: args.limit * EMBED_LIMIT_MULTIPLIER * 2,
+            },
+            query: {
+              formula: {
+                mult: [
+                  "$score",
+                  {
+                    sum: branch2ScoreComponents,
+                  },
+                ],
+              },
+            },
+            limit: args.limit * EMBED_LIMIT_MULTIPLIER,
+          },
+        ];
+      } else if (gaussianParams) {
+        // No tags, just temporal decay
+        const scoreModifierComponents: unknown[] = [1.0];
+        const gaussianDecay = buildGaussianDecay();
+        if (gaussianDecay) {
+          scoreModifierComponents.push(gaussianDecay);
         }
 
         filter = {
@@ -247,9 +308,11 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
         embeddingDimension: embedding.length,
         limit: args.limit * EMBED_LIMIT_MULTIPLIER,
         hasFilter: !!filter,
+        hasHybridBranches: !!hybridBranches,
         gaussianParams: gaussianParams,
         tags: args.tags,
         filter: filter,
+        hybridBranches: hybridBranches,
       });
 
       const results = await context.vectorClient.searchWithMetadataFilter(
@@ -258,6 +321,7 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
         filter,
         {
           limit: args.limit * EMBED_LIMIT_MULTIPLIER,
+          ...(hybridBranches ? { hybridBranches, fusion: "rrf" as const } : {}),
         },
       );
 

@@ -7,6 +7,18 @@ const logger = createLogger("qdrant");
 // biome-ignore lint/suspicious/noExplicitAny: Qdrant client doesn't export filter types
 type QdrantFilter = any; // We'll use any for now since the types aren't exported
 
+export interface SearchBranch {
+  prefetch: {
+    query: number[];
+    filter?: QdrantFilter;
+    limit: number;
+  };
+  query: {
+    formula: QdrantFilter;
+  };
+  limit: number;
+}
+
 export interface SearchOptions {
   query: string;
   collection: string;
@@ -14,6 +26,8 @@ export interface SearchOptions {
   scoreThreshold?: number;
   filter?: QdrantFilter;
   withPayload?: boolean | string[];
+  hybridBranches?: SearchBranch[];
+  fusion?: "rrf" | "dbsf";
 }
 
 export interface SearchResult {
@@ -53,6 +67,7 @@ export class VectorSearchClient {
       limit: options.limit,
       vectorDim: vector.length,
       hasFilter: !!options.filter,
+      hasHybridBranches: !!options.hybridBranches,
     });
 
     try {
@@ -62,28 +77,36 @@ export class VectorSearchClient {
         with_payload: options.withPayload ?? true,
       };
 
-      // Check if filter has score modifier structure (mult with $score)
-      const hasScoreModifier =
-        options.filter &&
-        typeof options.filter === "object" &&
-        "mult" in options.filter &&
-        Array.isArray(options.filter.mult) &&
-        options.filter.mult[0] === "$score";
-
-      if (hasScoreModifier) {
-        // Use prefetch for vector search, then rescore with formula
-        queryParams.prefetch = {
-          query: vector,
-          limit: (options.limit || 10) * 2, // Prefetch more for better rescoring
-        };
+      // Handle hybrid search with multiple branches
+      if (options.hybridBranches && options.hybridBranches.length > 0) {
+        queryParams.prefetch = options.hybridBranches;
         queryParams.query = {
-          formula: options.filter,
+          fusion: options.fusion || "rrf",
         };
       } else {
-        // Use vector directly as query
-        queryParams.query = vector;
-        if (options.filter != null) {
-          queryParams.filter = options.filter;
+        // Check if filter has score modifier structure (mult with $score)
+        const hasScoreModifier =
+          options.filter &&
+          typeof options.filter === "object" &&
+          "mult" in options.filter &&
+          Array.isArray(options.filter.mult) &&
+          options.filter.mult[0] === "$score";
+
+        if (hasScoreModifier) {
+          // Use prefetch for vector search, then rescore with formula
+          queryParams.prefetch = {
+            query: vector,
+            limit: (options.limit || 10) * 2, // Prefetch more for better rescoring
+          };
+          queryParams.query = {
+            formula: options.filter,
+          };
+        } else {
+          // Use vector directly as query
+          queryParams.query = vector;
+          if (options.filter != null) {
+            queryParams.filter = options.filter;
+          }
         }
       }
 
@@ -175,6 +198,8 @@ export class VectorSearchClient {
     options?: {
       limit?: number;
       scoreThreshold?: number;
+      hybridBranches?: SearchBranch[];
+      fusion?: "rrf" | "dbsf";
     },
   ): Promise<SearchResult[]> {
     const searchOptions: Omit<SearchOptions, "query"> = {
@@ -188,6 +213,14 @@ export class VectorSearchClient {
 
     if (options?.scoreThreshold != null) {
       searchOptions.scoreThreshold = options.scoreThreshold;
+    }
+
+    if (options?.hybridBranches != null) {
+      searchOptions.hybridBranches = options.hybridBranches;
+    }
+
+    if (options?.fusion != null) {
+      searchOptions.fusion = options.fusion;
     }
 
     return this.search(vector, searchOptions);
