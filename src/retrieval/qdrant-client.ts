@@ -130,7 +130,7 @@ export class VectorSearchClient {
       logger.debug({
         event: "qdrant_query_full_request",
         collection: options.collection,
-        fullParams: queryParams
+        fullParams: queryParams,
       });
 
       let results: Awaited<ReturnType<typeof this.client.query>>;

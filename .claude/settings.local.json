@@ -51,7 +51,13 @@
       "Bash(CONFIG_FILE=config.json LOG_LEVEL=debug LLM_MODEL=qwen3-vl timeout 60 bun start:*)",
       "WebFetch(domain:api.qdrant.tech)",
       "WebFetch(domain:qdrant.tech)",
-      "Bash(timeout 60 bash -c:*)"
+      "Bash(timeout 60 bash -c:*)",
+      "Bash(LOG_LEVEL=debug bun test-logging.ts:*)",
+      "Bash(LOG_LEVEL=debug LOG_SANITIZE=false bun test-logging.ts:*)",
+      "Bash(LOG_LEVEL=debug LOG_FORMAT=compact bun test-log-colors.ts:*)",
+      "Bash(LOG_LEVEL=debug LOG_FORMAT=compact bun:*)",
+      "Bash(LOG_LEVEL=debug LOG_FORMAT=hybrid bun test-all-formats.ts:*)",
+      "Bash(LOG_LEVEL=debug LOG_FORMAT=minimal bun test:*)"
     ],
     "deny": [],
     "ask": []

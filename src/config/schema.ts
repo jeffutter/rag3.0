@@ -43,8 +43,21 @@ export const configSchema = z.object({
     .object({
       level: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
       pretty: z.boolean().default(false),
+      format: z.enum(["compact", "hybrid", "minimal", "pretty"]).default("compact"),
+      sanitize: z.boolean().default(true),
+      maxArrayLength: z.number().default(3),
+      maxStringLength: z.number().default(500),
+      maxDepth: z.number().default(3),
     })
-    .default({ level: "info", pretty: false }),
+    .default({
+      level: "info",
+      pretty: false,
+      format: "compact",
+      sanitize: true,
+      maxArrayLength: 3,
+      maxStringLength: 500,
+      maxDepth: 3,
+    }),
 });
 
 export type Config = z.infer<typeof configSchema>;
@@ -160,13 +173,30 @@ export async function loadConfig(path?: string): Promise<Config> {
   }
 
   // Logging overrides
-  if (process.env.LOG_LEVEL || process.env.NODE_ENV) {
+  if (
+    process.env.LOG_LEVEL ||
+    process.env.NODE_ENV ||
+    process.env.LOG_FORMAT ||
+    process.env.LOG_SANITIZE ||
+    process.env.LOG_MAX_ARRAY_LENGTH ||
+    process.env.LOG_MAX_STRING_LENGTH ||
+    process.env.LOG_MAX_DEPTH
+  ) {
     envConfig.logging = {
       ...(typeof fileConfig === "object" && fileConfig !== null && "logging" in fileConfig
         ? (fileConfig.logging as Record<string, unknown>)
         : {}),
       ...(process.env.LOG_LEVEL ? { level: process.env.LOG_LEVEL } : {}),
       ...(process.env.NODE_ENV ? { pretty: process.env.NODE_ENV !== "production" } : {}),
+      ...(process.env.LOG_FORMAT ? { format: process.env.LOG_FORMAT } : {}),
+      ...(process.env.LOG_SANITIZE ? { sanitize: process.env.LOG_SANITIZE !== "false" } : {}),
+      ...(process.env.LOG_MAX_ARRAY_LENGTH
+        ? { maxArrayLength: Number.parseInt(process.env.LOG_MAX_ARRAY_LENGTH, 10) }
+        : {}),
+      ...(process.env.LOG_MAX_STRING_LENGTH
+        ? { maxStringLength: Number.parseInt(process.env.LOG_MAX_STRING_LENGTH, 10) }
+        : {}),
+      ...(process.env.LOG_MAX_DEPTH ? { maxDepth: Number.parseInt(process.env.LOG_MAX_DEPTH, 10) } : {}),
     };
   }
 

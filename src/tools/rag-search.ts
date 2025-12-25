@@ -193,24 +193,26 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
       // Calculate gaussian decay parameters if date range is provided
       const gaussianParams = processDateRange(args.start_date_time, args.end_date_time);
 
-      const recencyBoost = [{
-        mult: [
-          0.3, // Weight for recency decay
-          {
-            exp_decay: {
-              x: { datetime_key: "metadata.modified_timestamp" },
-              target: { datetime: new Date().toISOString() },
-              scale: 7776000, // ~90 days in seconds
-              midpoint: 0.5,
+      const recencyBoost = [
+        {
+          mult: [
+            0.3, // Weight for recency decay
+            {
+              exp_decay: {
+                x: { datetime_key: "metadata.modified_timestamp" },
+                target: { datetime: new Date().toISOString() },
+                scale: 7776000, // ~90 days in seconds
+                midpoint: 0.5,
+              },
             },
-          },
-        ],
-      }];
+          ],
+        },
+      ];
 
       // Helper to build gaussian decay component (for date ranges)
-      const gaussianDecay =
-        gaussianParams
-          ? [{
+      const gaussianDecay = gaussianParams
+        ? [
+            {
               mult: [
                 1.0, // Weight for gaussian decay
                 {
@@ -222,10 +224,12 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
                   },
                 },
               ],
-            }]
-          : [];
+            },
+          ]
+        : [];
 
-      const tagBoosts = args.tags?.map((tag) => ({
+      const tagBoosts =
+        args.tags?.map((tag) => ({
           mult: [
             0.25, // Weight boost per matching tag
             {
@@ -248,15 +252,10 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
               mult: [
                 "$score",
                 {
-                  sum: [
-                    1.0,
-                    ...recencyBoost,
-                    ...tagBoosts,
-                    ...gaussianDecay
-                  ]
-                }
-              ]
-            }
+                  sum: [1.0, ...recencyBoost, ...tagBoosts, ...gaussianDecay],
+                },
+              ],
+            },
           },
           limit: args.limit * EMBED_LIMIT_MULTIPLIER,
         },
@@ -279,15 +278,10 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
               mult: [
                 "$score",
                 {
-                  sum: [
-                    1.0,
-                    ...recencyBoost,
-                    ...tagBoosts,
-                    ...gaussianDecay
-                  ]
-                }
-              ]
-            }
+                  sum: [1.0, ...recencyBoost, ...tagBoosts, ...gaussianDecay],
+                },
+              ],
+            },
           },
           limit: args.limit * EMBED_LIMIT_MULTIPLIER,
         });

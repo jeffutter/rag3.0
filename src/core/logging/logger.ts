@@ -1,4 +1,6 @@
 import pino from "pino";
+import { createFormatterStream, type LogFormat } from "./formatter.js";
+import { getSanitizeOptionsFromEnv, sanitizeForLogging } from "./sanitizer.js";
 
 /**
  * Structured logging with Pino.
@@ -7,10 +9,14 @@ import pino from "pino";
  * - JSON output by default for machine parsing
  * - OpenTelemetry-compatible fields (traceId, spanId)
  * - Minimal overhead in production
- * - Pretty printing available for development
+ * - Compact, readable formats for development (via LOG_FORMAT)
+ * - Smart truncation of large objects/arrays for readability
  */
 
 const isDev = process.env.NODE_ENV !== "production";
+const sanitizeEnabled = process.env.LOG_SANITIZE !== "false";
+const sanitizeOptions = getSanitizeOptionsFromEnv();
+const logFormat = (process.env.LOG_FORMAT || "compact") as LogFormat | "pretty";
 
 // Base logger configuration
 const baseConfig = {
@@ -18,14 +24,16 @@ const baseConfig = {
 
   // Use standard OpenTelemetry field names for future compatibility
   messageKey: "msg",
-  timestamp: () => `,"time":"${new Date().toISOString()}"`,
+  timestamp: pino.stdTimeFunctions.isoTime,
 
-  // Add service metadata
-  base: {
-    service: "llm-orchestrator",
-    version: process.env.npm_package_version || "0.0.0",
-    pid: process.pid,
-  },
+  // Add service metadata (only in production JSON logs)
+  base: isDev
+    ? null
+    : {
+        service: "llm-orchestrator",
+        version: process.env.npm_package_version || "0.0.0",
+        pid: process.pid,
+      },
 
   // Custom serializers for common objects
   serializers: {
@@ -33,21 +41,35 @@ const baseConfig = {
     req: pino.stdSerializers.req,
     res: pino.stdSerializers.res,
   },
-} as const;
 
+  // Custom formatters for log sanitization
+  formatters: {
+    log(obj: Record<string, unknown>) {
+      if (!sanitizeEnabled) return obj;
+      return sanitizeForLogging(obj, sanitizeOptions) as Record<string, unknown>;
+    },
+  },
+};
+
+// Create logger with appropriate output format
 const baseLogger = isDev
-  ? pino({
-      ...baseConfig,
-      transport: {
-        target: "pino-pretty",
-        options: {
-          colorize: true,
-          translateTime: "HH:MM:ss.l",
-          ignore: "pid,hostname",
+  ? logFormat === "pretty"
+    ? // Use pino-pretty for traditional multi-line format
+      pino({
+        ...baseConfig,
+        transport: {
+          target: "pino-pretty",
+          options: {
+            colorize: true,
+            translateTime: "HH:MM:ss.l",
+            ignore: "pid,hostname",
+          },
         },
-      },
-    })
-  : pino(baseConfig);
+      })
+    : // Use custom formatter for compact/hybrid/minimal formats
+      pino(baseConfig, createFormatterStream(logFormat as LogFormat))
+  : // Production: JSON output
+    pino(baseConfig);
 
 // Type-safe child logger factory
 export interface LogContext {
