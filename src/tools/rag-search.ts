@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createLogger } from "../core/logging/logger";
+import { mergeConsecutiveChunks } from "../lib/chunk-merger";
 import { generateEmbeddings } from "../lib/embeddings";
 import { processDateRange } from "../lib/gaussian-decay";
 import type { ObsidianVaultUtilityClient } from "../lib/obsidian-vault-utility-client";
@@ -403,6 +404,20 @@ ${contentStr}`;
             event: "reranking_applied",
             originalTopScore: results[0]?.score,
             rerankedTopScore: finalResults[0]?.score,
+          });
+
+          // Merge consecutive chunks from the same document
+          logger.debug({
+            event: "chunk_merging_start",
+            resultCount: finalResults.length,
+          });
+
+          finalResults = mergeConsecutiveChunks(finalResults);
+
+          logger.info({
+            event: "chunk_merging_complete",
+            resultCount: finalResults.length,
+            topScore: finalResults[0]?.score,
           });
         } catch (error) {
           logger.error({

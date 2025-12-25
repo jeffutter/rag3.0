@@ -61,22 +61,29 @@ export function createGenerateEmbeddingsForBatchStep(config: EmbeddingConfig) {
       const embeddings = await generateEmbeddings(contents, config.endpoint, config.model);
 
       // Merge chunks with their embeddings
-      return input
-        .map((chunk, i) => {
-          const embedding = embeddings[i];
-          if (!embedding) {
-            console.error(`Missing embedding at index ${i}`);
-            return null;
-          }
+      const chunksWithEmbeddings: ChunkWithEmbedding[] = [];
 
-          return {
-            id: chunk.id,
-            content: chunk.content,
-            metadata: chunk.metadata,
-            embedding: embedding.embedding,
-          };
-        })
-        .filter((chunk): chunk is ChunkWithEmbedding => chunk !== null);
+      for (let i = 0; i < input.length; i++) {
+        const chunk = input[i];
+        const embedding = embeddings[i];
+
+        if (!embedding || !chunk) {
+          console.error(`Missing embedding or chunk at index ${i}`);
+          continue;
+        }
+
+        chunksWithEmbeddings.push({
+          id: chunk.id,
+          content: chunk.content,
+          metadata: {
+            ...chunk.metadata,
+            chunk_idx: chunk.index,
+          },
+          embedding: embedding.embedding,
+        });
+      }
+
+      return chunksWithEmbeddings;
     } catch (error) {
       console.error("Error generating embeddings for batch:", error);
       return [];

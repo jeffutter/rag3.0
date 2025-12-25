@@ -68,7 +68,6 @@ test("estimateCompletionTokens - with tool calls", () => {
       {
         role: "tool",
         tool_call_id: "call_123",
-        name: "search",
         content: JSON.stringify({ results: ["TypeScript is a programming language"] }),
       },
     ],
