@@ -59,6 +59,7 @@
       "Bash(LOG_LEVEL=debug LOG_FORMAT=hybrid bun test-all-formats.ts:*)",
       "Bash(LOG_LEVEL=debug LOG_FORMAT=minimal bun test:*)"
       "Bash(find:*)"
+      "Bash(find:*)",
     ],
     "deny": [],
     "ask": []

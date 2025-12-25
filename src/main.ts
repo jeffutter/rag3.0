@@ -25,6 +25,7 @@ async function main() {
       embeddingModel: config.embedding.model,
       qdrantURL: config.qdrant.url,
       qdrantCollection: config.qdrant.defaultCollection,
+      sparseEmbeddingEndpoint: config.sparseEmbedding.endpoint
     });
 
     // Initialize LLM client
@@ -109,6 +110,9 @@ async function main() {
     const ragSearchTool = await createRAGSearchTool({
       vectorClient,
       embeddingConfig,
+      ...(config.sparseEmbedding?.endpoint
+        ? { sparseEmbeddingEndpoint: config.sparseEmbedding.endpoint }
+        : {}),
       rerankConfig,
       defaultCollection: config.qdrant.defaultCollection,
       vaultClient,

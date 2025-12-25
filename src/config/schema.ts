@@ -21,6 +21,13 @@ export const configSchema = z.object({
     apiKey: z.string().optional(),
   }),
 
+  sparseEmbedding: z
+    .object({
+      endpoint: z.string().optional(),
+    })
+    .optional()
+    .default({}),
+
   reranker: z.object({
     baseURL: z.string(),
     model: z.string().optional(),
@@ -139,6 +146,16 @@ export async function loadConfig(path?: string): Promise<Config> {
       ...(process.env.EMBEDDING_BASE_URL ? { baseURL: process.env.EMBEDDING_BASE_URL } : {}),
       ...(process.env.EMBEDDING_MODEL ? { model: process.env.EMBEDDING_MODEL } : {}),
       ...(process.env.EMBEDDING_API_KEY ? { apiKey: process.env.EMBEDDING_API_KEY } : {}),
+    };
+  }
+
+  // Sparse Embedding overrides
+  if (process.env.SPARSE_EMBEDDING_ENDPOINT) {
+    envConfig.sparseEmbedding = {
+      ...(typeof fileConfig === "object" && fileConfig !== null && "sparseEmbedding" in fileConfig
+        ? (fileConfig.sparseEmbedding as Record<string, unknown>)
+        : {}),
+      endpoint: process.env.SPARSE_EMBEDDING_ENDPOINT,
     };
   }
 

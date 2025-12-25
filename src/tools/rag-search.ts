@@ -5,6 +5,7 @@ import { generateEmbeddings } from "../lib/embeddings";
 import { processDateRange } from "../lib/gaussian-decay";
 import type { ObsidianVaultUtilityClient } from "../lib/obsidian-vault-utility-client";
 import { type RerankConfig, rerankDocuments } from "../lib/reranker";
+import { generateSparseEmbeddings } from "../lib/sparse-embeddings";
 import type { ToolExample } from "../llm/types";
 import type { EmbeddingConfig } from "../retrieval/embedding";
 import type { SearchBranch, SearchResult, VectorSearchClient } from "../retrieval/qdrant-client";
@@ -15,6 +16,7 @@ const logger = createLogger("rag-tool");
 export interface RAGSearchContext {
   vectorClient: VectorSearchClient;
   embeddingConfig: EmbeddingConfig;
+  sparseEmbeddingEndpoint?: string;
   rerankConfig?: RerankConfig;
   defaultCollection: string;
   vaultClient: ObsidianVaultUtilityClient;
@@ -161,7 +163,7 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
         tags: args.tags,
       });
 
-      // Generate embedding for query
+      // Generate dense embedding for query
       const embeddingUrl = `${context.embeddingConfig.baseURL}/embeddings`;
 
       logger.trace({
@@ -198,6 +200,38 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
       }
 
       const embedding = embeddingResults[0].embedding;
+
+      // Generate sparse embedding if endpoint is configured
+      let sparseEmbedding: { indices: number[]; values: number[] } | undefined;
+      if (context.sparseEmbeddingEndpoint) {
+        try {
+          logger.trace({
+            event: "sparse_embedding_request",
+            endpoint: context.sparseEmbeddingEndpoint,
+            query: args.query,
+          });
+
+          const sparseResults = await generateSparseEmbeddings([args.query], context.sparseEmbeddingEndpoint);
+
+          if (sparseResults[0]) {
+            sparseEmbedding = sparseResults[0].embedding;
+            logger.trace({
+              event: "sparse_embedding_parsed",
+              valuesCount: sparseEmbedding.values.length,
+              indicesCount: sparseEmbedding.indices.length,
+              firstFewValues: sparseEmbedding.values.slice(0, 5),
+              firstFewIndices: sparseEmbedding.indices.slice(0, 5),
+            });
+          }
+        } catch (error) {
+          logger.warn({
+            event: "sparse_embedding_failed",
+            error: error instanceof Error ? error.message : String(error),
+            message: "Falling back to dense embeddings only",
+          });
+          // Continue without sparse embeddings
+        }
+      }
 
       // Calculate gaussian decay parameters if date range is provided
       const gaussianParams = processDateRange(args.start_date_time, args.end_date_time);
@@ -248,29 +282,49 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
           ],
         })) || [];
 
+      // Build scoring formula (used in each branch before RRF fusion)
+      const scoringFormula = {
+        mult: [
+          "$score",
+          {
+            sum: [1.0, ...recencyBoost, ...tagBoosts, ...gaussianDecay],
+          },
+        ],
+      };
+
       // Always build hybrid search with nested prefetch structure
+      // Each branch applies boosts BEFORE RRF fusion
       const hybridBranches: SearchBranch[] = [
-        // Branch 1: Vector similarity with recency, tag boosts, and temporal decay
+        // Branch 1: Dense vector similarity with scoring formula
         {
           prefetch: {
             query: embedding,
+            using: "rag",
             limit: 100,
           },
           query: {
-            formula: {
-              mult: [
-                "$score",
-                {
-                  sum: [1.0, ...recencyBoost, ...tagBoosts, ...gaussianDecay],
-                },
-              ],
-            },
+            formula: scoringFormula,
           },
           limit: args.limit * EMBED_LIMIT_MULTIPLIER,
         },
       ];
 
-      // Branch 2: Tag-focused search (only if tags provided)
+      // Branch 2: Sparse vector (BM42) with scoring formula if available
+      if (sparseEmbedding) {
+        hybridBranches.push({
+          prefetch: {
+            query: sparseEmbedding,
+            using: "bm42",
+            limit: 100,
+          },
+          query: {
+            formula: scoringFormula,
+          },
+          limit: args.limit * EMBED_LIMIT_MULTIPLIER,
+        });
+      }
+
+      // Branch 3: Tag-focused search with scoring formula (only if tags provided)
       if (args.tags?.length) {
         hybridBranches.push({
           prefetch: {
@@ -283,14 +337,7 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
             limit: 1000,
           },
           query: {
-            formula: {
-              mult: [
-                "$score",
-                {
-                  sum: [1.0, ...recencyBoost, ...tagBoosts, ...gaussianDecay],
-                },
-              ],
-            },
+            formula: scoringFormula,
           },
           limit: args.limit * EMBED_LIMIT_MULTIPLIER,
         });
@@ -300,6 +347,8 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
         event: "vector_search_params",
         collection: context.defaultCollection,
         embeddingDimension: embedding.length,
+        hasSparseEmbedding: !!sparseEmbedding,
+        sparseEmbeddingSize: sparseEmbedding?.values.length,
         limit: args.limit * EMBED_LIMIT_MULTIPLIER,
         hasHybridBranches: true,
         branchCount: hybridBranches.length,

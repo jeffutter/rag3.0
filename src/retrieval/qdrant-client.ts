@@ -7,9 +7,15 @@ const logger = createLogger("qdrant");
 // biome-ignore lint/suspicious/noExplicitAny: Qdrant client doesn't export filter types
 type QdrantFilter = any; // We'll use any for now since the types aren't exported
 
+export interface SparseVector {
+  indices: number[];
+  values: number[];
+}
+
 export interface SearchBranch {
   prefetch: {
-    query?: number[];
+    query?: number[] | SparseVector;
+    using?: string;
     filter?: QdrantFilter;
     limit: number;
   };
@@ -96,6 +102,7 @@ export class VectorSearchClient {
           // Use prefetch for vector search, then rescore with formula
           queryParams.prefetch = {
             query: vector,
+            using: "rag",
             limit: (options.limit || 10) * 2, // Prefetch more for better rescoring
           };
           queryParams.query = {
@@ -104,6 +111,7 @@ export class VectorSearchClient {
         } else {
           // Use vector directly as query
           queryParams.query = vector;
+          queryParams.using = "rag";
           if (options.filter != null) {
             queryParams.filter = options.filter;
           }
