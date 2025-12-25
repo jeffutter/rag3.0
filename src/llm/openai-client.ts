@@ -58,7 +58,7 @@ export class OpenAICompatibleClient implements LLMClient {
 
     const createParams: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming = {
       model: options.model,
-      messages: this.convertMessages(options.messages),
+      messages: this.convertMessages(options.messages, options.model, !!tools?.length),
       temperature: options.temperature ?? 0.7,
     };
 
@@ -133,6 +133,13 @@ export class OpenAICompatibleClient implements LLMClient {
     const messages = [...options.messages];
     let lastResponse: CompletionResponse | null = null;
 
+    // Track tool calls to detect loops
+    const previousToolCallSignatures = new Set<string>();
+    // biome-ignore lint/style/preferConst: These values are modified in the loop
+    let consecutiveSameToolCount = 0;
+    // biome-ignore lint/style/preferConst: These values are modified in the loop
+    let lastToolName: string | null = null;
+
     for (let i = 0; i < maxIterations; i++) {
       logger.debug({
         event: "tool_loop_iteration",
@@ -146,32 +153,110 @@ export class OpenAICompatibleClient implements LLMClient {
         messages,
       });
 
-      // If no tool calls, we're done
-      if (!lastResponse.message.toolCalls?.length) {
+      // Check if we should stop (model indicated completion OR no tool calls)
+      const shouldStop = lastResponse.finishReason !== "tool_calls" || !lastResponse.message.toolCalls?.length;
+
+      if (shouldStop) {
         logger.debug({
-          event: "no_tool_calls",
+          event: "tool_loop_stopping",
           iteration: i + 1,
           finishReason: lastResponse.finishReason,
+          hasToolCalls: !!lastResponse.message.toolCalls?.length,
+          reason: lastResponse.finishReason !== "tool_calls" ? "model_indicated_completion" : "no_tool_calls",
         });
+        return lastResponse;
+      }
+
+      // Type narrowing: we know toolCalls exists and has items after the shouldStop check
+      const toolCalls = lastResponse.message.toolCalls;
+      if (!toolCalls) {
+        // This should never happen given the shouldStop check, but satisfies TypeScript
         return lastResponse;
       }
 
       logger.debug({
         event: "tool_calls_received",
         iteration: i + 1,
-        toolCallCount: lastResponse.message.toolCalls.length,
-        toolCalls: lastResponse.message.toolCalls.map((tc) => ({
+        toolCallCount: toolCalls.length,
+        toolCalls: toolCalls.map((tc) => ({
           id: tc.id,
           name: tc.name,
           arguments: tc.arguments,
         })),
       });
 
+      // Check for duplicate tool calls (Fix 1: Duplicate Detection)
+      const toolCallSignature = toolCalls
+        .map((tc) => `${tc.name}:${JSON.stringify(tc.arguments)}`)
+        .sort()
+        .join("|");
+
+      if (previousToolCallSignatures.has(toolCallSignature)) {
+        logger.warn({
+          event: "duplicate_tool_calls_detected",
+          iteration: i + 1,
+          toolCalls: toolCalls.map((tc) => tc.name),
+          signature: toolCallSignature,
+        });
+
+        // Force model to respond without tools
+        messages.push(lastResponse.message);
+        messages.push({
+          role: "user",
+          content:
+            "You've already tried these exact tool calls. Please provide your final answer without using tools again.",
+        });
+
+        // Make one final call without tool use (omit tools property to disable)
+        const { tools: _tools, ...optionsWithoutTools } = options;
+        const finalResponse = await this.complete({
+          ...optionsWithoutTools,
+          messages,
+        });
+
+        return finalResponse;
+      }
+
+      previousToolCallSignatures.add(toolCallSignature);
+
+      // Check for consecutive same-tool calls (Fix 2: Consecutive Detection)
+      const currentToolName = toolCalls[0]?.name;
+      if (currentToolName === lastToolName) {
+        consecutiveSameToolCount++;
+        if (consecutiveSameToolCount >= 3) {
+          logger.warn({
+            event: "repeated_tool_calls_detected",
+            iteration: i + 1,
+            toolName: currentToolName,
+            consecutiveCount: consecutiveSameToolCount,
+          });
+
+          // Force model to respond without tools (same as duplicate handling)
+          messages.push(lastResponse.message);
+          messages.push({
+            role: "user",
+            content: `You've called the "${currentToolName}" tool ${consecutiveSameToolCount} times in a row. Please provide your final answer without using tools again.`,
+          });
+
+          // Make one final call without tool use (omit tools property to disable)
+          const { tools: _tools, ...optionsWithoutTools } = options;
+          const finalResponse = await this.complete({
+            ...optionsWithoutTools,
+            messages,
+          });
+
+          return finalResponse;
+        }
+      } else {
+        consecutiveSameToolCount = 1;
+        lastToolName = currentToolName ?? null;
+      }
+
       // Add assistant message with tool calls
       messages.push(lastResponse.message);
 
       // Execute tools and add results
-      for (const toolCall of lastResponse.message.toolCalls) {
+      for (const toolCall of toolCalls) {
         const tool = options.tools?.find((t) => t.name === toolCall.name);
 
         if (!tool) {
@@ -257,20 +342,49 @@ export class OpenAICompatibleClient implements LLMClient {
       }
     }
 
+    // Fix 4: Enhanced logging when max iterations reached
     logger.warn({
       event: "tool_loop_max_iterations",
       maxIterations,
+      toolCallHistory: Array.from(previousToolCallSignatures),
+      lastToolCalls: lastResponse?.message.toolCalls?.map((tc) => ({
+        name: tc.name,
+        args: tc.arguments,
+      })),
+      lastFinishReason: lastResponse?.finishReason,
+      consecutiveSameToolCount,
+      lastToolName,
     });
 
     // biome-ignore lint/style/noNonNullAssertion: lastResponse is guaranteed to be set after loop
     return lastResponse!;
   }
 
-  private convertMessages(messages: Message[]): OpenAI.Chat.ChatCompletionMessageParam[] {
-    return messages.map((msg) => {
+  private convertMessages(
+    messages: Message[],
+    model: string,
+    hasTools: boolean,
+  ): OpenAI.Chat.ChatCompletionMessageParam[] {
+    return messages.map((msg, index) => {
       switch (msg.role) {
-        case "system":
-          return { role: "system", content: msg.content };
+        case "system": {
+          let content = msg.content;
+
+          // LFM2 models (except lfm2-vl-3b) need "force json schema." appended to system prompt
+          // when using tools with llama.cpp
+          const needsJsonSchemaForce =
+            hasTools && model.toLowerCase().includes("lfm2") && !model.toLowerCase().includes("lfm2-vl-3b");
+
+          if (needsJsonSchemaForce && index === messages.findIndex((m) => m.role === "system")) {
+            content = `${content}\n\nforce json schema.`;
+            logger.debug({
+              event: "lfm2_json_schema_force_applied",
+              model,
+            });
+          }
+
+          return { role: "system", content };
+        }
         case "user":
           return { role: "user", content: msg.content };
         case "assistant": {
