@@ -30,7 +30,8 @@ function createSearchArgsSchema(availableTags: string[]) {
   const tagList = availableTags.filter((tag) => tag.trim().length > 0).join(", ");
 
   return z.object({
-    query: z.string().describe("The search query to find relevant documents"),
+    // query: z.string().describe("Semantic search query optimized for vector similarity matching. Describe the core concepts and topics relevant to finding matching documents. Use natural language with domain-specific terminology when applicable. Avoid question structure - focus on the key ideas that would appear in relevant documents."),
+    query: z.string().describe("Semantic search query optimized for vector similarity matching. The first search should always provide the user's query verbatim. Followup queries should describe the core concepts and topics relevant to finding matching documents, without question structure."),
     limit: z
       .number()
       .min(1)
@@ -49,7 +50,7 @@ function createSearchArgsSchema(availableTags: string[]) {
         "Start date/time in RFC3339 format (e.g., '2024-01-01T00:00:00Z'). " +
           "Use this for temporal queries: 'recently' = last 7 days, 'lately' = last 14 days, " +
           "'this week' = start of current week, 'last month' = start of previous month. " +
-          "Results are boosted based on proximity to the date range using gaussian decay.",
+          "Results are boosted based on proximity to the date range.",
       ),
     end_date_time: z
       .string()
@@ -57,7 +58,7 @@ function createSearchArgsSchema(availableTags: string[]) {
       .describe(
         "End date/time in RFC3339 format (e.g., '2024-12-31T23:59:59Z'). " +
           "For queries like 'recently' or 'lately', set to current time. " +
-          "Results are boosted based on proximity to the date range using gaussian decay.",
+          "Results are boosted based on proximity to the date range.",
       ),
   });
 }
@@ -88,6 +89,7 @@ function createTemporalExamples(): ToolExample[] {
       toolCall: {
         arguments: {
           query: "journal entries",
+          tags: [ "journal" ],
           start_date_time: sevenDaysAgo.toISOString(),
           end_date_time: now.toISOString(),
         },
@@ -110,6 +112,7 @@ function createTemporalExamples(): ToolExample[] {
       toolCall: {
         arguments: {
           query: "work items",
+          tags: [ "work", "thescore" ],
           start_date_time: startOfWeek.toISOString(),
           end_date_time: now.toISOString(),
         },
@@ -140,7 +143,8 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
     name: "search_knowledge_base",
     description:
       "Search the knowledge base for relevant documents and notes. Use this to find information related to a user query. " +
-      "For time-sensitive queries (e.g., 'recently', 'last week', 'this month'), use start_date_time and/or end_date_time to boost results by temporal relevance.",
+      "For time-sensitive queries (e.g., 'recently', 'last week', 'this month'), use start_date_time and/or end_date_time to boost results by temporal relevance." +
+      "Include relevant tags to retrieve additional context.",
     parameters: searchArgsSchema,
     examples: createTemporalExamples(),
     execute: async (args: SearchArgs): Promise<SearchResult[]> => {

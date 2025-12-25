@@ -126,7 +126,7 @@ async function main() {
       llmClient,
       tools: toolRegistry.getAll(),
       model: config.llm.model,
-      systemPrompt: `You are an expert in calling tool functions. You will receive a problem and a set of possible tool functions. Based on the problem, you need to make one or more function/tool calls to achieve the goal. Please try to explore solving the problem using the available tools.
+      systemPrompt: `You are an expert in calling tool functions. You will receive a problem and a set of possible tool functions. Based on the problem, you need to make one or more function/tool calls to achieve the goal. Please try to explore solving the problem using the available tools. You may use the same tool multiple times with different queries, if appropriate.
 
 When interpreting temporal language in queries:
 - "recently" or "lately" = last 7-14 days (use start_date_time)
