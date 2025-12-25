@@ -1,8 +1,49 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { AjvJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/ajv-provider.js";
 import { createLogger } from "../core/logging/logger";
+import { NormalizingJsonSchemaValidator } from "./mcp-schema-validator";
 
 const logger = createLogger("mcp-http-client");
+
+/**
+ * Normalizes JSON Schema to use standard formats.
+ * Replaces non-standard formats like "uint" with standard JSON Schema types.
+ * Handles nested schemas including $defs.
+ */
+function normalizeSchema(schema: any): any {
+  if (!schema || typeof schema !== "object") {
+    return schema;
+  }
+
+  // Handle arrays
+  if (Array.isArray(schema)) {
+    return schema.map(normalizeSchema);
+  }
+
+  // Clone the object to avoid mutation
+  const normalized = { ...schema };
+
+  // Replace non-standard "uint" format with standard integer + minimum constraint
+  if (normalized.format === "uint") {
+    delete normalized.format;
+    normalized.type = "integer";
+    normalized.minimum = 0;
+    logger.debug({
+      event: "normalized_uint_format",
+      field: normalized.description || "unknown",
+    });
+  }
+
+  // Recursively normalize all nested objects (including $defs, properties, items, etc.)
+  for (const key in normalized) {
+    if (typeof normalized[key] === "object" && normalized[key] !== null) {
+      normalized[key] = normalizeSchema(normalized[key]);
+    }
+  }
+
+  return normalized;
+}
 
 export interface MCPServerConfig {
   url: string;
@@ -36,6 +77,10 @@ export class MCPHTTPClient {
       fetch: globalThis.fetch,
     });
 
+    // Create a normalizing validator to handle non-standard formats like "uint"
+    const baseValidator = new AjvJsonSchemaValidator();
+    const normalizingValidator = new NormalizingJsonSchemaValidator(baseValidator);
+
     this.client = new Client(
       {
         name: config.name || "rag-query-client",
@@ -47,6 +92,8 @@ export class MCPHTTPClient {
           experimental: {},
           sampling: {},
         },
+        // Use our custom validator that normalizes schemas
+        jsonSchemaValidator: normalizingValidator,
       },
     );
   }
@@ -108,14 +155,20 @@ export class MCPHTTPClient {
 
       const response = await this.client.listTools();
 
+      // Normalize tool schemas to use standard JSON Schema formats
+      const normalizedTools = response.tools.map((tool) => ({
+        ...tool,
+        inputSchema: normalizeSchema(tool.inputSchema),
+      }));
+
       logger.info({
         event: "mcp_tools_listed",
         url: this.config.url,
-        toolCount: response.tools.length,
-        tools: response.tools.map((t) => t.name),
+        toolCount: normalizedTools.length,
+        tools: normalizedTools.map((t) => t.name),
       });
 
-      return response.tools;
+      return normalizedTools;
     } catch (error) {
       logger.error({
         event: "mcp_list_tools_failed",
