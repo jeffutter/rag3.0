@@ -39,6 +39,20 @@ export const configSchema = z.object({
     baseURL: z.string(),
   }),
 
+  mcp: z
+    .object({
+      servers: z
+        .array(
+          z.object({
+            url: z.string(),
+            name: z.string().optional(),
+          }),
+        )
+        .optional()
+        .default([]),
+    })
+    .default({ servers: [] }),
+
   logging: z
     .object({
       level: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
@@ -170,6 +184,18 @@ export async function loadConfig(path?: string): Promise<Config> {
         : {}),
       baseURL: process.env.VAULT_BASE_URL,
     };
+  }
+
+  // MCP overrides
+  if (process.env.MCP_SERVERS) {
+    try {
+      const servers = JSON.parse(process.env.MCP_SERVERS);
+      envConfig.mcp = {
+        servers: Array.isArray(servers) ? servers : [],
+      };
+    } catch (_error) {
+      // Invalid JSON, ignore
+    }
   }
 
   // Logging overrides

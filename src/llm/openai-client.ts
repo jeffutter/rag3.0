@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { z } from "zod";
 import { createLogger } from "../core/logging/logger";
+import { estimateAndFormatTokens } from "./token-estimation";
 import type { AssistantMessage, CompletionOptions, CompletionResponse, LLMClient, Message } from "./types";
 
 const logger = createLogger("llm-client");
@@ -79,9 +80,13 @@ export class OpenAICompatibleClient implements LLMClient {
       createParams.stop = options.stopSequences;
     }
 
+    const { estimatedTokens, formattedSize } = estimateAndFormatTokens(createParams);
+
     logger.debug({
       event: "completion_params",
       params: createParams,
+      estimatedTokens,
+      estimatedSize: formattedSize,
     });
 
     const response = await this.client.chat.completions.create(createParams);
@@ -135,9 +140,7 @@ export class OpenAICompatibleClient implements LLMClient {
 
     // Track tool calls to detect loops
     const previousToolCallSignatures = new Set<string>();
-    // biome-ignore lint/style/preferConst: These values are modified in the loop
     let consecutiveSameToolCount = 0;
-    // biome-ignore lint/style/preferConst: These values are modified in the loop
     let lastToolName: string | null = null;
 
     for (let i = 0; i < maxIterations; i++) {

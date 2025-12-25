@@ -1,6 +1,8 @@
 import { loadConfig } from "./config/schema";
 import { createLogger } from "./core/logging/logger";
 import { runCLI } from "./io/cli";
+import { MCPHTTPClient } from "./lib/mcp-http-client";
+import { loadMCPTools } from "./lib/mcp-tool-adapter";
 import { createObsidianVaultUtilityClient } from "./lib/obsidian-vault-utility-client";
 import { OpenAICompatibleClient } from "./llm/openai-client";
 import { VectorSearchClient } from "./retrieval/qdrant-client";
@@ -114,6 +116,52 @@ async function main() {
 
     toolRegistry.register(ragSearchTool);
 
+    // Track MCP clients for cleanup
+    const mcpClients: MCPHTTPClient[] = [];
+
+    // Load MCP tools if configured
+    if (config.mcp.servers.length > 0) {
+      logger.info({
+        event: "loading_mcp_tools",
+        serverCount: config.mcp.servers.length,
+        servers: config.mcp.servers.map((s) => ({ url: s.url, name: s.name })),
+      });
+
+      for (const serverConfig of config.mcp.servers) {
+        try {
+          logger.debug({
+            event: "connecting_to_mcp_server",
+            url: serverConfig.url,
+            name: serverConfig.name,
+          });
+
+          const mcpClient = new MCPHTTPClient(serverConfig);
+          await mcpClient.connect();
+          mcpClients.push(mcpClient); // Track for cleanup
+          const mcpTools = await loadMCPTools(mcpClient);
+
+          for (const tool of mcpTools) {
+            toolRegistry.register(tool);
+          }
+
+          logger.info({
+            event: "mcp_tools_registered",
+            url: serverConfig.url,
+            toolCount: mcpTools.length,
+            tools: mcpTools.map((t) => t.name),
+          });
+        } catch (error) {
+          logger.warn({
+            event: "mcp_server_failed",
+            url: serverConfig.url,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          console.warn(`Failed to load MCP tools from ${serverConfig.url}:`, error);
+          // Continue with other servers even if one fails
+        }
+      }
+    }
+
     logger.info({
       event: "tools_registered",
       toolCount: toolRegistry.getAll().length,
@@ -122,11 +170,12 @@ async function main() {
 
     // Run CLI
     const currentDateTime = new Date().toISOString(); // RFC3339 format
-    await runCLI({
-      llmClient,
-      tools: toolRegistry.getAll(),
-      model: config.llm.model,
-      systemPrompt: `You are an expert in calling tool functions. You will receive a problem and a set of possible tool functions. Based on the problem, you need to make one or more function/tool calls to achieve the goal. Please try to explore solving the problem using the available tools. You may use the same tool multiple times with different queries, if appropriate.
+    try {
+      await runCLI({
+        llmClient,
+        tools: toolRegistry.getAll(),
+        model: config.llm.model,
+        systemPrompt: `You are an expert in calling tool functions. You will receive a problem and a set of possible tool functions. Based on the problem, you need to make one or more function/tool calls to achieve the goal. Please try to explore solving the problem using the available tools. You may use the same tool multiple times with different queries, if appropriate.
 
 When interpreting temporal language in queries:
 - "recently" or "lately" = last 7-14 days (use start_date_time)
@@ -144,17 +193,40 @@ Be concise but thorough in your responses.
 
 Current date and time: ${currentDateTime}
 `,
-      //       systemPrompt: `You are a helpful assistant with access to a personal knowledge base.
-      //
-      // When asked a question:
-      // 1. Use the search_knowledge_base tool to find relevant information
-      // 2. Synthesize the information into a clear, helpful response
-      // 3. Cite sources when relevant
-      //
-      // Be concise but thorough in your responses.`,
-    });
+        //       systemPrompt: `You are a helpful assistant with access to a personal knowledge base.
+        //
+        // When asked a question:
+        // 1. Use the search_knowledge_base tool to find relevant information
+        // 2. Synthesize the information into a clear, helpful response
+        // 3. Cite sources when relevant
+        //
+        // Be concise but thorough in your responses.`,
+      });
+    } finally {
+      // Clean up MCP connections
+      logger.debug({
+        event: "cleanup_start",
+        mcpClientCount: mcpClients.length,
+      });
 
-    logger.info({ event: "shutdown_complete" });
+      for (const mcpClient of mcpClients) {
+        try {
+          await mcpClient.disconnect();
+        } catch (error) {
+          logger.warn({
+            event: "cleanup_mcp_disconnect_error",
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      logger.info({ event: "shutdown_complete" });
+
+      // Force exit to close any remaining connections (HTTP keep-alive, etc.)
+      // This is necessary because HTTP clients (OpenAI, Qdrant, MCP) may keep
+      // connections alive even after requests complete
+      process.exit(0);
+    }
   } catch (error) {
     logger.fatal({
       event: "fatal_error",

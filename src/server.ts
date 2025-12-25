@@ -108,6 +108,7 @@ async function main() {
       model: config.llm.model,
       embeddingConfig,
       defaultCollection: config.qdrant.defaultCollection,
+      mcpServers: config.mcp.servers,
     });
 
     pipelineRegistry.register(ragQueryPipeline);
