@@ -161,6 +161,12 @@ export function createToolFromMCP(
           textContentCount: textContent.length,
         });
 
+        logger.trace({
+          event: "mcp_tool_full_result",
+          toolName: mcpTool.name,
+          result,
+        });
+
         // Return combined text content or the full result
         return textContent.length > 0 ? textContent.join("\n\n") : result;
       } catch (error) {
@@ -179,13 +185,13 @@ export function createToolFromMCP(
  * Loads all tools from an MCP server and converts them to ToolDefinitions.
  */
 export async function loadMCPTools(mcpClient: MCPHTTPClient): Promise<ToolDefinition[]> {
-  logger.info({
+  logger.debug({
     event: "loading_mcp_tools",
   });
 
   const mcpTools = await mcpClient.listTools();
 
-  logger.info({
+  logger.debug({
     event: "mcp_tools_fetched",
     count: mcpTools.length,
     tools: mcpTools.map((t) => t.name),
@@ -193,7 +199,7 @@ export async function loadMCPTools(mcpClient: MCPHTTPClient): Promise<ToolDefini
 
   const toolDefinitions = mcpTools.map((tool) => createToolFromMCP(mcpClient, tool));
 
-  logger.info({
+  logger.debug({
     event: "mcp_tools_converted",
     count: toolDefinitions.length,
   });

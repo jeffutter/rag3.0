@@ -121,7 +121,7 @@ async function main() {
 
     // Load MCP tools if configured
     if (config.mcp.servers.length > 0) {
-      logger.info({
+      logger.debug({
         event: "loading_mcp_tools",
         serverCount: config.mcp.servers.length,
         servers: config.mcp.servers.map((s) => ({ url: s.url, name: s.name })),
@@ -144,7 +144,7 @@ async function main() {
             toolRegistry.register(tool);
           }
 
-          logger.info({
+          logger.debug({
             event: "mcp_tools_registered",
             url: serverConfig.url,
             toolCount: mcpTools.length,
@@ -156,13 +156,12 @@ async function main() {
             url: serverConfig.url,
             error: error instanceof Error ? error.message : String(error),
           });
-          console.warn(`Failed to load MCP tools from ${serverConfig.url}:`, error);
           // Continue with other servers even if one fails
         }
       }
     }
 
-    logger.info({
+    logger.debug({
       event: "tools_registered",
       toolCount: toolRegistry.getAll().length,
       tools: toolRegistry.getAll().map((t) => t.name),
@@ -220,7 +219,7 @@ Current date and time: ${currentDateTime}
         }
       }
 
-      logger.info({ event: "shutdown_complete" });
+      logger.debug({ event: "shutdown_complete" });
 
       // Force exit to close any remaining connections (HTTP keep-alive, etc.)
       // This is necessary because HTTP clients (OpenAI, Qdrant, MCP) may keep

@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { z } from "zod";
 import { createLogger } from "../core/logging/logger";
+import { formatAsCurl } from "../lib/curl-formatter";
 import { estimateAndFormatTokens } from "./token-estimation";
 import type { AssistantMessage, CompletionOptions, CompletionResponse, LLMClient, Message } from "./types";
 
@@ -17,12 +18,16 @@ const logger = createLogger("llm-client");
  */
 export class OpenAICompatibleClient implements LLMClient {
   private client: OpenAI;
+  private baseURL: string;
+  private apiKey: string | undefined;
 
   constructor(options: {
     baseURL: string;
     apiKey?: string;
     timeout?: number;
   }) {
+    this.baseURL = options.baseURL;
+    this.apiKey = options.apiKey;
     this.client = new OpenAI({
       baseURL: options.baseURL,
       apiKey: options.apiKey || "not-required",
@@ -41,7 +46,7 @@ export class OpenAICompatibleClient implements LLMClient {
         // unrepresentable: "any", // Handle unsupported types gracefully
       }) as Record<string, unknown>;
 
-      logger.debug({
+      logger.trace({
         event: "tool_schema_generated",
         toolName: tool.name,
         jsonSchema: jsonSchema,
@@ -83,16 +88,52 @@ export class OpenAICompatibleClient implements LLMClient {
     const { estimatedTokens, formattedSize } = estimateAndFormatTokens(createParams);
 
     logger.debug({
-      event: "completion_params",
-      params: createParams,
+      event: "completion_request",
+      model: createParams.model,
+      messageCount: createParams.messages.length,
+      toolCount: createParams.tools?.length || 0,
+      temperature: createParams.temperature,
       estimatedTokens,
       estimatedSize: formattedSize,
     });
+
+    logger.trace({
+      event: "completion_full_params",
+      params: createParams,
+    });
+
+    // Log curl command if LOG_CURL is enabled
+    if (process.env.LOG_CURL === "true") {
+      const curlCommand = formatAsCurl({
+        baseURL: this.baseURL,
+        apiKey: this.apiKey,
+        endpoint: "/v1/chat/completions",
+        body: createParams,
+      });
+
+      logger.info({
+        event: "curl_command",
+        curl: curlCommand,
+      });
+
+      // Also log to console for easy copy-paste
+      console.error("\n--- OpenAI API Request (curl) ---");
+      console.error(curlCommand);
+      console.error("--- End curl command ---\n");
+    }
 
     const response = await this.client.chat.completions.create(createParams);
 
     logger.debug({
       event: "completion_response",
+      finishReason: response.choices[0]?.finish_reason,
+      hasToolCalls: !!response.choices[0]?.message.tool_calls,
+      toolCallCount: response.choices[0]?.message.tool_calls?.length || 0,
+      usage: response.usage,
+    });
+
+    logger.trace({
+      event: "completion_full_response",
       response: response,
     });
 

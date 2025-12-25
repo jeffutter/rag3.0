@@ -1,7 +1,10 @@
+import { createLogger } from "../../core/logging/logger";
 import { createStep } from "../../core/pipeline/steps";
 import { addEOT } from "../../lib/text-processing";
 import type { FileEntry } from "./extract-files";
 import type { ChunkData } from "./split-markdown-for-embed";
+
+const logger = createLogger("add-eot-step");
 
 /**
  * Create an Add EOT To Chunk step for pipeline.
@@ -44,7 +47,11 @@ export function createAddEOTToChunkStep(eotToken?: string) {
         content,
       };
     } catch (error) {
-      console.warn(`Error adding EOT to chunk ${input.id}:`, error);
+      logger.warn({
+        event: "add_eot_error",
+        chunkId: input.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
       return input;
     }
   });

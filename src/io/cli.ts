@@ -43,6 +43,7 @@ export async function runCLI(options: CLIOptions) {
       query: { type: "string", short: "q" },
       interactive: { type: "boolean", short: "i", default: false },
       verbose: { type: "boolean", short: "v", default: false },
+      logCurl: { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
     },
     strict: false,
@@ -56,6 +57,10 @@ export async function runCLI(options: CLIOptions) {
 
   if (values.verbose) {
     process.env.LOG_LEVEL = "debug";
+  }
+
+  if (values.logCurl) {
+    process.env.LOG_CURL = "true";
   }
 
   const baseSystemPrompt =
@@ -202,6 +207,7 @@ OPTIONS:
   -q, --query <text>      Single query mode (explicit)
   -i, --interactive       Interactive chat mode
   -v, --verbose           Enable debug logging
+  --log-curl              Log OpenAI requests as curl commands for debugging
   -h, --help              Show this help message
 
 EXAMPLES:

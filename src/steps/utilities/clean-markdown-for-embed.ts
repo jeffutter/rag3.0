@@ -1,6 +1,9 @@
+import { createLogger } from "../../core/logging/logger";
 import { createStep } from "../../core/pipeline/steps";
 import { cleanMarkdown } from "../../lib/markdown";
 import type { FileEntry } from "./extract-files";
+
+const logger = createLogger("clean-markdown-step");
 
 /**
  * Create a Clean Markdown For Embed step for pipeline.
@@ -40,7 +43,11 @@ export function createCleanMarkdownForEmbedStep(headingsToRemove?: string[]) {
         },
       ];
     } catch (error) {
-      console.warn(`Error cleaning file ${input.path}:`, error);
+      logger.warn({
+        event: "markdown_clean_error",
+        path: input.path,
+        error: error instanceof Error ? error.message : String(error),
+      });
       return [];
     }
   });

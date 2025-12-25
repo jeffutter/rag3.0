@@ -66,7 +66,7 @@ export class MCPHTTPClient {
     this.config = config;
     const url = new URL(config.url);
 
-    logger.info({
+    logger.debug({
       event: "mcp_client_init",
       url: config.url,
       name: config.name,
@@ -111,7 +111,7 @@ export class MCPHTTPClient {
     }
 
     try {
-      logger.info({
+      logger.debug({
         event: "mcp_connecting",
         url: this.config.url,
       });
@@ -123,7 +123,7 @@ export class MCPHTTPClient {
       const serverInfo = this.client.getServerVersion();
       const capabilities = this.client.getServerCapabilities();
 
-      logger.info({
+      logger.debug({
         event: "mcp_connected",
         url: this.config.url,
         serverInfo,
@@ -161,7 +161,7 @@ export class MCPHTTPClient {
         inputSchema: normalizeSchema(tool.inputSchema),
       }));
 
-      logger.info({
+      logger.debug({
         event: "mcp_tools_listed",
         url: this.config.url,
         toolCount: normalizedTools.length,
@@ -200,7 +200,7 @@ export class MCPHTTPClient {
         arguments: args,
       });
 
-      logger.info({
+      logger.debug({
         event: "mcp_tool_called",
         url: this.config.url,
         toolName: name,
@@ -228,7 +228,7 @@ export class MCPHTTPClient {
     }
 
     try {
-      logger.info({
+      logger.debug({
         event: "mcp_disconnecting",
         url: this.config.url,
       });
@@ -236,7 +236,7 @@ export class MCPHTTPClient {
       await this.transport.close();
       this.connected = false;
 
-      logger.info({
+      logger.debug({
         event: "mcp_disconnected",
         url: this.config.url,
       });

@@ -156,17 +156,17 @@ export async function runMCPServer(options: MCPServerOptions) {
   // Connect server to transport
   await server.connect(transport);
 
-  logger.info({ event: "mcp_server_started" });
+  logger.debug({ event: "mcp_server_started" });
 
   // Handle shutdown
   process.on("SIGINT", async () => {
-    logger.info({ event: "mcp_server_shutting_down" });
+    logger.debug({ event: "mcp_server_shutting_down" });
     await server.close();
     process.exit(0);
   });
 
   process.on("SIGTERM", async () => {
-    logger.info({ event: "mcp_server_shutting_down" });
+    logger.debug({ event: "mcp_server_shutting_down" });
     await server.close();
     process.exit(0);
   });

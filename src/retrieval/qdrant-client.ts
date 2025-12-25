@@ -114,22 +114,22 @@ export class VectorSearchClient {
         queryParams.score_threshold = options.scoreThreshold;
       }
 
-      logger.debug({
+      logger.trace({
         event: "qdrant_query_request",
         collection: options.collection,
         params: {
           vectorDim: vector.length,
-          vectorPreview: vector.slice(0, 5),
           limit: queryParams.limit,
           scoreThreshold: queryParams.score_threshold,
-          filter: queryParams.filter,
+          hasFilter: !!queryParams.filter,
           withPayload: queryParams.with_payload,
         },
       });
 
-      logger.debug({
+      logger.trace({
         event: "qdrant_query_full_request",
         collection: options.collection,
+        vectorPreview: vector.slice(0, 5),
         fullParams: queryParams,
       });
 
@@ -137,7 +137,7 @@ export class VectorSearchClient {
       try {
         results = await this.client.query(options.collection, queryParams);
 
-        logger.debug({
+        logger.trace({
           event: "qdrant_query_raw_response",
           collection: options.collection,
           rawResponse: results,
@@ -155,7 +155,7 @@ export class VectorSearchClient {
 
       const durationMs = performance.now() - startTime;
 
-      logger.debug({
+      logger.trace({
         event: "qdrant_query_response",
         collection: options.collection,
         resultCount: results.points.length,

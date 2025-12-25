@@ -164,7 +164,7 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
       // Generate embedding for query
       const embeddingUrl = `${context.embeddingConfig.baseURL}/embeddings`;
 
-      logger.debug({
+      logger.trace({
         event: "embedding_http_request",
         method: "POST",
         url: embeddingUrl,
@@ -182,7 +182,7 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
         context.embeddingConfig.apiKey,
       );
 
-      logger.debug({
+      logger.trace({
         event: "embedding_parsed",
         dataCount: embeddingResults.length,
         embeddingDimension: embeddingResults[0]?.embedding?.length,
@@ -305,6 +305,11 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
         branchCount: hybridBranches.length,
         gaussianParams: gaussianParams,
         tags: args.tags,
+      });
+
+      logger.trace({
+        event: "vector_search_full_params",
+        collection: context.defaultCollection,
         hybridBranches: hybridBranches,
       });
 
@@ -319,7 +324,7 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
         },
       );
 
-      logger.info({
+      logger.debug({
         event: "vector_search_complete",
         resultCount: results.length,
         topScore: results[0]?.score,
@@ -371,12 +376,6 @@ ${contentStr}`;
         try {
           const rerankResults = await rerankDocuments(args.query, documents, context.rerankConfig, args.limit);
 
-          logger.debug({
-            event: "reranking_complete",
-            rerankResultCount: rerankResults.length,
-            topRerankScore: rerankResults[0]?.relevance_score,
-          });
-
           // Reorder the original results based on reranker output
           const rerankedResults: SearchResult[] = [];
           for (const rerankResult of rerankResults) {
@@ -401,7 +400,8 @@ ${contentStr}`;
           finalResults = rerankedResults;
 
           logger.info({
-            event: "reranking_applied",
+            event: "reranking_complete",
+            resultCount: rerankResults.length,
             originalTopScore: results[0]?.score,
             rerankedTopScore: finalResults[0]?.score,
           });
@@ -439,7 +439,7 @@ ${contentStr}`;
         reranked: !!context.rerankConfig,
       });
 
-      logger.debug({
+      logger.trace({
         event: "rag_search_full_results",
         results: finalResults,
       });

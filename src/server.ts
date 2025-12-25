@@ -121,7 +121,7 @@ async function main() {
 
     // Run appropriate server based on mode
     if (mode === "mcp") {
-      logger.info({ event: "starting_mcp_server" });
+      logger.debug({ event: "starting_mcp_server" });
       await runMCPServer({
         pipelineRegistry,
         serverName: "llm-orchestrator-mcp",

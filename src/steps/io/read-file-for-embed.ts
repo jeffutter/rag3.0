@@ -1,6 +1,9 @@
+import { createLogger } from "../../core/logging/logger";
 import { createStep } from "../../core/pipeline/steps";
 import { readFile } from "../../lib/file-io";
 import type { FileEntry } from "../utilities/extract-files";
+
+const logger = createLogger("read-file-step");
 
 /**
  * Read File For Embed step for pipeline.
@@ -24,7 +27,11 @@ export const readFileForEmbedStep = createStep<
     const result = await readFile(input.path);
     return [{ ...result, path: input.path }];
   } catch (error) {
-    console.warn(`Error reading file ${input.path}:`, error);
+    logger.warn({
+      event: "file_read_error",
+      path: input.path,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return [];
   }
 });

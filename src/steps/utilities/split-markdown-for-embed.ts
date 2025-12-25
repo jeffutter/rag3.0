@@ -1,6 +1,9 @@
+import { createLogger } from "../../core/logging/logger";
 import { createStep } from "../../core/pipeline/steps";
 import { splitMarkdown } from "../../lib/markdown";
 import type { FileEntry } from "./extract-files";
+
+const logger = createLogger("split-markdown-step");
 
 /**
  * Interface for chunk data from split markdown step.
@@ -68,7 +71,11 @@ export function createSplitMarkdownForEmbedStep(config: SplitConfig) {
 
       return chunks;
     } catch (error) {
-      console.warn(`Error splitting file ${input.path}:`, error);
+      logger.warn({
+        event: "markdown_split_error",
+        path: input.path,
+        error: error instanceof Error ? error.message : String(error),
+      });
       return [];
     }
   });

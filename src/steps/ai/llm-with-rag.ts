@@ -1,3 +1,4 @@
+import { createLogger } from "../../core/logging/logger";
 import { createStep } from "../../core/pipeline/steps";
 import type { ObsidianVaultUtilityClient } from "../../lib/obsidian-vault-utility-client";
 import type { OpenAICompatibleClient } from "../../llm/openai-client";
@@ -6,6 +7,8 @@ import type { VectorSearchClient } from "../../retrieval/qdrant-client";
 import { MCPHTTPClient, type MCPServerConfig } from "../../lib/mcp-http-client";
 import { loadMCPTools } from "../../lib/mcp-tool-adapter";
 import { createRAGSearchTool } from "../../tools/rag-search";
+
+const logger = createLogger("llm-with-rag-step");
 
 /**
  * Input schema for LLM with RAG step.
@@ -73,7 +76,11 @@ export const llmWithRAGStep = createStep<
         const mcpTools = await loadMCPTools(mcpClient);
         tools.push(...mcpTools);
       } catch (error) {
-        console.warn(`Failed to load MCP tools from ${serverConfig.url}:`, error);
+        logger.warn({
+          event: "mcp_tools_load_failed",
+          url: serverConfig.url,
+          error: error instanceof Error ? error.message : String(error),
+        });
         // Continue with other servers even if one fails
       }
     }

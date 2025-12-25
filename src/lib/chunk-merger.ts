@@ -57,7 +57,7 @@ function mergeChunks(chunk1: ChunkWithIndex, chunk2: ChunkWithIndex): ChunkWithI
     // Remove overlap from second chunk
     mergedContent = content1 + content2.slice(overlapLen);
 
-    logger.debug({
+    logger.trace({
       event: "chunks_merged_with_overlap",
       source: chunk1.source,
       chunk1Index: chunk1.chunkIndex,
@@ -68,7 +68,7 @@ function mergeChunks(chunk1: ChunkWithIndex, chunk2: ChunkWithIndex): ChunkWithI
     // No overlap found, add a space separator
     mergedContent = `${content1} ${content2}`;
 
-    logger.debug({
+    logger.trace({
       event: "chunks_merged_without_overlap",
       source: chunk1.source,
       chunk1Index: chunk1.chunkIndex,
@@ -192,7 +192,7 @@ export function mergeConsecutiveChunks(results: SearchResult[], maxIndexGap = 2)
     chunksBySource.set(source, chunks);
   }
 
-  logger.debug({
+  logger.trace({
     event: "chunks_grouped_by_source",
     sourceCount: chunksBySource.size,
     sources: Array.from(chunksBySource.keys()),
@@ -205,7 +205,7 @@ export function mergeConsecutiveChunks(results: SearchResult[], maxIndexGap = 2)
     // Sort by chunk index
     chunks.sort((a, b) => a.chunkIndex - b.chunkIndex);
 
-    logger.debug({
+    logger.trace({
       event: "processing_source",
       source,
       chunkCount: chunks.length,
@@ -232,7 +232,7 @@ export function mergeConsecutiveChunks(results: SearchResult[], maxIndexGap = 2)
 
       if (indexDiff <= maxIndexGap && indexDiff >= 1) {
         // Adjacent or near-adjacent, merge them
-        logger.debug({
+        logger.trace({
           event: "merging_chunks",
           source,
           chunk1Index: lastIndex,
@@ -243,7 +243,7 @@ export function mergeConsecutiveChunks(results: SearchResult[], maxIndexGap = 2)
         merged[merged.length - 1] = mergeChunks(lastMerged, current);
       } else {
         // Not adjacent, keep as separate chunk
-        logger.debug({
+        logger.trace({
           event: "keeping_separate",
           source,
           lastIndex,
@@ -255,7 +255,7 @@ export function mergeConsecutiveChunks(results: SearchResult[], maxIndexGap = 2)
       }
     }
 
-    logger.debug({
+    logger.trace({
       event: "source_processed",
       source,
       originalCount: chunks.length,
