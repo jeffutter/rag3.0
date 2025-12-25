@@ -31,7 +31,11 @@ function createSearchArgsSchema(availableTags: string[]) {
 
   return z.object({
     // query: z.string().describe("Semantic search query optimized for vector similarity matching. Describe the core concepts and topics relevant to finding matching documents. Use natural language with domain-specific terminology when applicable. Avoid question structure - focus on the key ideas that would appear in relevant documents."),
-    query: z.string().describe("Semantic search query optimized for vector similarity matching. The first search should always provide the user's query verbatim. Followup queries should describe the core concepts and topics relevant to finding matching documents, without question structure."),
+    query: z
+      .string()
+      .describe(
+        "Semantic search query optimized for vector similarity matching. The first search should always provide the user's query verbatim. Followup queries should describe the core concepts and topics relevant to finding matching documents, without question structure.",
+      ),
     limit: z
       .number()
       .min(1)
@@ -89,7 +93,7 @@ function createTemporalExamples(): ToolExample[] {
       toolCall: {
         arguments: {
           query: "journal entries",
-          tags: [ "journal" ],
+          tags: ["journal"],
           start_date_time: sevenDaysAgo.toISOString(),
           end_date_time: now.toISOString(),
         },
@@ -112,7 +116,7 @@ function createTemporalExamples(): ToolExample[] {
       toolCall: {
         arguments: {
           query: "work items",
-          tags: [ "work", "thescore" ],
+          tags: ["work", "thescore"],
           start_date_time: startOfWeek.toISOString(),
           end_date_time: now.toISOString(),
         },
@@ -333,15 +337,34 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
           resultCount: results.length,
         });
 
-        // Extract document content from results
-        // Assuming the payload has a 'content' field
+        // Format documents for reranking with metadata
         const documents = results.map((r) => {
           const content = r.payload.content;
-          if (typeof content === "string") {
-            return content;
-          }
-          // Fallback: stringify the entire payload if content is not a string
-          return JSON.stringify(r.payload);
+          const metadata = r.payload.metadata as { modified_timestamp?: string; tags?: string[] } | undefined;
+
+          // Extract title from ID (filename without .md, converted to titlecase)
+          const filename = typeof r.id === "string" ? r.id.split("/").pop() || r.id : String(r.id);
+          const titleWithoutExt = filename.replace(/\.md$/, "");
+          const title = titleWithoutExt
+            .split(/[-_\s]+/)
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .join(" ");
+
+          // Format date in RFC3339
+          const date = metadata?.modified_timestamp || "Unknown";
+
+          // Format tags as comma-separated list
+          const tags = metadata?.tags?.join(", ") || "None";
+
+          // Build formatted document
+          const contentStr = typeof content === "string" ? content : JSON.stringify(r.payload);
+
+          return `Title: ${title}
+Date: ${date}
+Tags: ${tags}
+
+Body:
+${contentStr}`;
         });
 
         try {
