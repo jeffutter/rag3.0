@@ -193,10 +193,24 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
       // Calculate gaussian decay parameters if date range is provided
       const gaussianParams = processDateRange(args.start_date_time, args.end_date_time);
 
-      // Helper to build gaussian decay component
-      const buildGaussianDecay = () =>
+      const recencyBoost = [{
+        mult: [
+          0.3, // Weight for recency decay
+          {
+            exp_decay: {
+              x: { datetime_key: "metadata.modified_timestamp" },
+              target: { datetime: new Date().toISOString() },
+              scale: 7776000, // ~90 days in seconds
+              midpoint: 0.5,
+            },
+          },
+        ],
+      }];
+
+      // Helper to build gaussian decay component (for date ranges)
+      const gaussianDecay =
         gaussianParams
-          ? {
+          ? [{
               mult: [
                 1.0, // Weight for gaussian decay
                 {
@@ -208,98 +222,75 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
                   },
                 },
               ],
-            }
-          : null;
+            }]
+          : [];
 
-      // Helper to build tag boost components
-      const buildTagBoosts = () =>
-        args.tags?.map((tag) => ({
+      const tagBoosts = args.tags?.map((tag) => ({
           mult: [
             0.25, // Weight boost per matching tag
             {
-              key: "tags",
+              key: "metadata.tags",
               match: { value: tag },
             },
           ],
         })) || [];
 
-      // Build hybrid search when tags are provided, otherwise use single search
-      let filter: unknown;
-      let hybridBranches: SearchBranch[] | undefined;
+      // Always build hybrid search with nested prefetch structure
+      const hybridBranches: SearchBranch[] = [
+        // Branch 1: Vector similarity with recency, tag boosts, and temporal decay
+        {
+          prefetch: {
+            query: embedding,
+            limit: 100,
+          },
+          query: {
+            formula: {
+              mult: [
+                "$score",
+                {
+                  sum: [
+                    1.0,
+                    ...recencyBoost,
+                    ...tagBoosts,
+                    ...gaussianDecay
+                  ]
+                }
+              ]
+            }
+          },
+          limit: args.limit * EMBED_LIMIT_MULTIPLIER,
+        },
+      ];
 
+      // Branch 2: Tag-focused search (only if tags provided)
       if (args.tags?.length) {
-        // Branch 1: Vector similarity with tag boosts AND temporal decay
-        const branch1ScoreComponents: unknown[] = [1.0];
-        const gaussianDecay = buildGaussianDecay();
-        if (gaussianDecay) {
-          branch1ScoreComponents.push(gaussianDecay);
-        }
-        branch1ScoreComponents.push(...buildTagBoosts());
-
-        // Branch 2: Tag-focused search with temporal decay
-        const branch2ScoreComponents: unknown[] = [1.0];
-        if (gaussianDecay) {
-          branch2ScoreComponents.push(gaussianDecay);
-        }
-
-        hybridBranches = [
-          {
-            prefetch: {
-              query: embedding,
-              limit: args.limit * EMBED_LIMIT_MULTIPLIER * 2,
+        hybridBranches.push({
+          prefetch: {
+            filter: {
+              should: args.tags.map((tag) => ({
+                key: "metadata.tags",
+                match: { value: tag },
+              })),
             },
-            query: {
-              formula: {
-                mult: [
-                  "$score",
-                  {
-                    sum: branch1ScoreComponents,
-                  },
-                ],
-              },
-            },
-            limit: args.limit * EMBED_LIMIT_MULTIPLIER,
+            limit: 1000,
           },
-          {
-            prefetch: {
-              query: embedding,
-              filter: {
-                should: args.tags.map((tag) => ({
-                  key: "tags",
-                  match: { value: tag },
-                })),
-              },
-              limit: args.limit * EMBED_LIMIT_MULTIPLIER * 2,
-            },
-            query: {
-              formula: {
-                mult: [
-                  "$score",
-                  {
-                    sum: branch2ScoreComponents,
-                  },
-                ],
-              },
-            },
-            limit: args.limit * EMBED_LIMIT_MULTIPLIER,
+          query: {
+            formula: {
+              mult: [
+                "$score",
+                {
+                  sum: [
+                    1.0,
+                    ...recencyBoost,
+                    ...tagBoosts,
+                    ...gaussianDecay
+                  ]
+                }
+              ]
+            }
           },
-        ];
-      } else if (gaussianParams) {
-        // No tags, just temporal decay
-        const scoreModifierComponents: unknown[] = [1.0];
-        const gaussianDecay = buildGaussianDecay();
-        if (gaussianDecay) {
-          scoreModifierComponents.push(gaussianDecay);
-        }
-
-        filter = {
-          mult: [
-            "$score",
-            {
-              sum: scoreModifierComponents,
-            },
-          ],
-        };
+          limit: args.limit * EMBED_LIMIT_MULTIPLIER,
+        });
       }
 
       logger.debug({
@@ -307,21 +298,21 @@ export async function createRAGSearchTool(context: RAGSearchContext) {
         collection: context.defaultCollection,
         embeddingDimension: embedding.length,
         limit: args.limit * EMBED_LIMIT_MULTIPLIER,
-        hasFilter: !!filter,
-        hasHybridBranches: !!hybridBranches,
+        hasHybridBranches: true,
+        branchCount: hybridBranches.length,
         gaussianParams: gaussianParams,
         tags: args.tags,
-        filter: filter,
         hybridBranches: hybridBranches,
       });
 
       const results = await context.vectorClient.searchWithMetadataFilter(
         embedding,
         context.defaultCollection,
-        filter,
+        undefined, // No filter - using hybrid branches instead
         {
           limit: args.limit * EMBED_LIMIT_MULTIPLIER,
-          ...(hybridBranches ? { hybridBranches, fusion: "rrf" as const } : {}),
+          hybridBranches,
+          fusion: "rrf",
         },
       );
 

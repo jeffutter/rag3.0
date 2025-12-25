@@ -33,6 +33,9 @@
             # For native dependencies if needed
             openssl
             pkg-config
+
+            httpie
+            posting
           ];
 
           shellHook = ''

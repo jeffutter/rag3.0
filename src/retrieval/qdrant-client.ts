@@ -9,7 +9,7 @@ type QdrantFilter = any; // We'll use any for now since the types aren't exporte
 
 export interface SearchBranch {
   prefetch: {
-    query: number[];
+    query?: number[];
     filter?: QdrantFilter;
     limit: number;
   };
@@ -130,7 +130,7 @@ export class VectorSearchClient {
       logger.debug({
         event: "qdrant_query_full_request",
         collection: options.collection,
-        fullParams: JSON.stringify(queryParams, null, 2),
+        fullParams: queryParams
       });
 
       let results: Awaited<ReturnType<typeof this.client.query>>;
@@ -140,7 +140,7 @@ export class VectorSearchClient {
         logger.debug({
           event: "qdrant_query_raw_response",
           collection: options.collection,
-          rawResponse: JSON.stringify(results, null, 2),
+          rawResponse: results,
         });
       } catch (error) {
         logger.error({
