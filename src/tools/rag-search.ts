@@ -1,13 +1,12 @@
 import { z } from "zod";
 import { createLogger } from "../core/logging/logger";
 import { mergeConsecutiveChunks } from "../lib/chunk-merger";
-import { generateEmbeddings } from "../lib/embeddings";
+import { type EmbeddingConfig, generateEmbeddings } from "../lib/embeddings";
 import { processDateRange } from "../lib/gaussian-decay";
 import type { ObsidianVaultUtilityClient } from "../lib/obsidian-vault-utility-client";
 import { type RerankConfig, rerankDocuments } from "../lib/reranker";
 import { generateSparseEmbeddings } from "../lib/sparse-embeddings";
 import type { ToolExample } from "../llm/types";
-import type { EmbeddingConfig } from "../retrieval/embedding";
 import type { SearchBranch, SearchResult, VectorSearchClient } from "../retrieval/qdrant-client";
 import { defineTool } from "./registry";
 

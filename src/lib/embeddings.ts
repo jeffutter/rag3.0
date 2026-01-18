@@ -1,6 +1,16 @@
 import { z } from "zod";
 
 /**
+ * Configuration for embedding API endpoints.
+ * Used by RAG search and other embedding consumers.
+ */
+export interface EmbeddingConfig {
+  baseURL: string;
+  model: string;
+  apiKey?: string;
+}
+
+/**
  * API request schema for OpenAI-compatible embeddings endpoint.
  */
 const EmbeddingRequestSchema = z.object({
