@@ -71,7 +71,9 @@
       "Bash(bd create:*)",
       "Bash(bd update:*)",
       "Bash(bd show:*)",
-      "Bash(bd sync:*)"
+      "Bash(bd sync:*)",
+      "Skill(beads:list)",
+      "Bash(LOG_LEVEL=info bun test:*)"
     ],
     "deny": [],
     "ask": []
