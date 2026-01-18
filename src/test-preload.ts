@@ -11,7 +11,9 @@
 (globalThis as { __BUN_TEST__?: boolean }).__BUN_TEST__ = true;
 
 // Set env var for any modules that haven't loaded yet
-if (!process.env.LOG_LEVEL) {
+// Unconditionally set to "silent" unless TEST_VERBOSE is enabled
+// This overrides any LOG_LEVEL from .env or .envrc files
+if (process.env.TEST_VERBOSE !== "1") {
   process.env.LOG_LEVEL = "silent";
 }
 
@@ -32,13 +34,15 @@ if (process.env.TEST_VERBOSE !== "1") {
     debug: console.debug,
     info: console.info,
     warn: console.warn,
+    table: console.table,
     // Keep console.error visible - often important for debugging failures
   };
 
   console.log = noop;
   console.debug = noop;
   console.info = noop;
-  // console.warn is kept as it may indicate actual issues
+  console.warn = noop;
+  console.table = noop;
 
   // Expose original console for tests that explicitly need it
   (globalThis as unknown as { __originalConsole: typeof originalConsole }).__originalConsole = originalConsole;

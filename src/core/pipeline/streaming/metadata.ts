@@ -18,7 +18,10 @@
  * @module streaming/metadata
  */
 
+import { createLogger } from "../../logging/logger";
 import type { StepMetadata } from "../types";
+
+const logger = createLogger("stream-metadata");
 
 /**
  * Extended metadata type for streaming pipeline operations.
@@ -164,7 +167,7 @@ export class MetadataCollector {
   recordItemEnd(index: number, success: boolean): void {
     const item = this.activeItems.get(index);
     if (!item) {
-      console.warn(`MetadataCollector: Attempted to end item ${index} that was never started`);
+      logger.warn({ event: "item_not_started", index }, "Attempted to end item that was never started");
       return;
     }
 

@@ -1,7 +1,10 @@
+import { createLogger } from "../../core/logging/logger";
 import { createStep } from "../../core/pipeline/steps";
 import { generateEmbeddings } from "../../lib/embeddings";
 import type { FileEntry } from "../utilities/extract-files";
 import type { ChunkData } from "../utilities/split-markdown-for-embed";
+
+const logger = createLogger("generate-embeddings");
 
 /**
  * Interface for chunk with embedding attached.
@@ -68,7 +71,7 @@ export function createGenerateEmbeddingsForBatchStep(config: EmbeddingConfig) {
         const embedding = embeddings[i];
 
         if (!embedding || !chunk) {
-          console.error(`Missing embedding or chunk at index ${i}`);
+          logger.warn({ event: "missing_data", index: i }, "Missing embedding or chunk");
           continue;
         }
 
@@ -85,7 +88,7 @@ export function createGenerateEmbeddingsForBatchStep(config: EmbeddingConfig) {
 
       return chunksWithEmbeddings;
     } catch (error) {
-      console.error("Error generating embeddings for batch:", error);
+      logger.error({ event: "embedding_error", error }, "Error generating embeddings for batch");
       return [];
     }
   });

@@ -381,21 +381,17 @@ describe("Metadata edge cases", () => {
     expect(snapshot.streamMetrics.successCount).toBe(3);
   });
 
-  test("warns when ending non-started item", () => {
+  test("handles ending non-started item gracefully", () => {
     const collector = new MetadataCollector("testStep");
 
-    // Mock console.warn to check if warning is logged
-    const originalWarn = console.warn;
-    let warnCalled = false;
-    console.warn = () => {
-      warnCalled = true;
-    };
-
+    // Ending a non-started item should not throw and should not affect counts
     collector.recordItemEnd(99, true);
 
-    console.warn = originalWarn;
-
-    expect(warnCalled).toBe(true);
+    const snapshot = collector.getSnapshot();
+    // Counters should remain at zero since the item was never properly started
+    expect(snapshot.streamMetrics.totalItems).toBe(0);
+    expect(snapshot.streamMetrics.successCount).toBe(0);
+    expect(snapshot.streamMetrics.failureCount).toBe(0);
   });
 
   test("calculates throughput correctly", async () => {

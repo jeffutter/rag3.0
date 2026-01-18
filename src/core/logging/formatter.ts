@@ -158,8 +158,20 @@ export function getFormatter(format: LogFormat): (log: LogObject) => string {
   }
 }
 
+// Pino log levels (same as defined in pino)
+const pinoLevels: Record<string, number> = {
+  trace: 10,
+  debug: 20,
+  info: 30,
+  warn: 40,
+  error: 50,
+  fatal: 60,
+  silent: Number.POSITIVE_INFINITY,
+};
+
 /**
  * Create a Pino write stream that formats logs using custom formatters.
+ * Respects the LOG_LEVEL environment variable to suppress logs during tests.
  */
 export function createFormatterStream(format: LogFormat) {
   const formatter = getFormatter(format);
@@ -168,6 +180,21 @@ export function createFormatterStream(format: LogFormat) {
     write(chunk: string) {
       try {
         const log = JSON.parse(chunk) as LogObject;
+
+        // Check if we should suppress this log based on LOG_LEVEL
+        const configuredLevel = process.env.LOG_LEVEL || "info";
+        const configuredLevelNum = pinoLevels[configuredLevel] ?? 30;
+
+        // If the log level is below our threshold, don't output
+        if (log.level < configuredLevelNum) {
+          return;
+        }
+
+        // If level is silent, suppress all logs
+        if (configuredLevel === "silent") {
+          return;
+        }
+
         const formatted = formatter(log);
         process.stdout.write(`${formatted}\n`);
       } catch {
