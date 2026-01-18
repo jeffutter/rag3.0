@@ -66,7 +66,12 @@
       "Bash(TEST_VERBOSE=1 bun test:*)",
       "Bash(for i in {1..5})",
       "Bash(do echo \"=== Run $i ===\")",
-      "Bash(done)"
+      "Bash(done)",
+      "Skill(beads:create)",
+      "Bash(bd create:*)",
+      "Bash(bd update:*)",
+      "Bash(bd show:*)",
+      "Bash(bd sync:*)"
     ],
     "deny": [],
     "ask": []
