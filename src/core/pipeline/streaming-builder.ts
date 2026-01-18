@@ -34,6 +34,8 @@
  */
 
 import { createLogger } from "../logging/logger";
+import type { ProgressTracker } from "./progress/tracker";
+import type { ProgressOptions } from "./progress/types";
 import {
   fromArray,
   batch as genBatch,
@@ -96,6 +98,16 @@ interface PipelineStage {
   key: string;
   // biome-ignore lint/suspicious/noExplicitAny: Internal type-erased storage for pipeline stages
   transform: (input: AsyncGenerator<any>) => AsyncGenerator<any>;
+}
+
+/**
+ * Options for executing pipelines with progress tracking.
+ */
+export interface ExecuteWithProgressOptions {
+  /** Progress tracker instance */
+  tracker?: ProgressTracker;
+  /** Progress options (creates a new tracker if tracker not provided) */
+  progressOptions?: ProgressOptions;
 }
 
 /**
@@ -842,6 +854,176 @@ export class StreamingPipeline<
 
     return accumulator;
   }
+
+  /**
+   * Get the names of all stages in this pipeline.
+   *
+   * @returns Array of stage names in order
+   */
+  getStageNames(): string[] {
+    return this.stages.map((s) => s.key);
+  }
+
+  /**
+   * Execute the pipeline with progress tracking.
+   *
+   * Wraps each stage with progress tracking to monitor items processed
+   * and yielded at each step of the pipeline.
+   *
+   * @param input - Initial input (single item or generator)
+   * @param tracker - Progress tracker instance to record progress
+   * @returns Async generator of results with progress tracking
+   *
+   * @example
+   * ```typescript
+   * import { createProgressTracker, createProgressRenderer } from './progress';
+   *
+   * const tracker = createProgressTracker();
+   * const renderer = createProgressRenderer(tracker, { mode: 'verbose' });
+   *
+   * renderer.start();
+   *
+   * for await (const item of pipeline.executeWithProgress(input, tracker)) {
+   *   console.log(item);
+   * }
+   *
+   * renderer.stop();
+   * console.log(tracker.generateSummary());
+   * ```
+   */
+  executeWithProgress(
+    input: TInitialInput | AsyncGenerator<TInitialInput>,
+    tracker: ProgressTracker,
+  ): AsyncGenerator<TCurrentOutput> {
+    const stages = this.stages;
+    const stageNames = stages.map((s) => s.key);
+
+    // Notify tracker of pipeline start
+    tracker.pipelineStarted(stageNames);
+
+    // Wrap each stage with progress tracking
+    const wrappedStages = stages.map((stage, index) => ({
+      key: stage.key,
+      // biome-ignore lint/suspicious/noExplicitAny: Type erasure needed for internal storage
+      transform: (input: AsyncGenerator<any>): AsyncGenerator<any> => {
+        // Notify step start
+        tracker.stepStarted(stage.key, index);
+
+        // Wrap input to track items processed
+        const trackedInput = wrapWithInputTracking(input, stage.key, tracker);
+
+        // Apply the original transform
+        const output = stage.transform(trackedInput);
+
+        // Wrap output to track items yielded
+        return wrapWithOutputTracking(output, stage.key, index, stages.length, tracker);
+      },
+    }));
+
+    // Build the tracked pipeline
+    return this.buildWithStages(input, wrappedStages, tracker);
+  }
+
+  /**
+   * Internal method to build pipeline with custom stages.
+   */
+  private buildWithStages(
+    input: TInitialInput | AsyncGenerator<TInitialInput>,
+    stages: PipelineStage[],
+    tracker?: ProgressTracker,
+  ): AsyncGenerator<TCurrentOutput> {
+    // Convert input to async generator if needed
+    let stream: AsyncGenerator<TInitialInput>;
+
+    if (typeof input === "object" && input !== null && Symbol.asyncIterator in input) {
+      stream = input as AsyncGenerator<TInitialInput>;
+    } else {
+      stream = fromArray([input as TInitialInput]);
+    }
+
+    // Compose all stages
+    // biome-ignore lint/suspicious/noExplicitAny: Type erasure needed for composition
+    let result = stream as AsyncGenerator<any>;
+    for (const stage of stages) {
+      result = stage.transform(result);
+    }
+
+    // Wrap final output to detect completion
+    if (tracker) {
+      return wrapWithCompletion(result as AsyncGenerator<TCurrentOutput>, tracker);
+    }
+
+    return result as AsyncGenerator<TCurrentOutput>;
+  }
+}
+
+/**
+ * Wrap an async generator to track input items processed.
+ */
+function wrapWithInputTracking<T>(
+  source: AsyncGenerator<T>,
+  stepName: string,
+  tracker: ProgressTracker,
+): AsyncGenerator<T> {
+  return (async function* () {
+    try {
+      for await (const item of source) {
+        tracker.recordItemProcessed(stepName);
+        yield item;
+      }
+    } finally {
+      await source.return?.(undefined);
+    }
+  })();
+}
+
+/**
+ * Wrap an async generator to track output items yielded.
+ */
+function wrapWithOutputTracking<T>(
+  source: AsyncGenerator<T>,
+  stepName: string,
+  _stepIndex: number,
+  _totalSteps: number,
+  tracker: ProgressTracker,
+): AsyncGenerator<T> {
+  return (async function* () {
+    try {
+      for await (const item of source) {
+        tracker.recordItemYielded(stepName);
+        yield item;
+      }
+      // Step completed successfully
+      tracker.stepCompleted(stepName);
+    } catch (error) {
+      // Step failed
+      tracker.stepError(stepName, error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    } finally {
+      await source.return?.(undefined);
+    }
+  })();
+}
+
+/**
+ * Wrap the final output to detect pipeline completion.
+ */
+function wrapWithCompletion<T>(source: AsyncGenerator<T>, tracker: ProgressTracker): AsyncGenerator<T> {
+  return (async function* () {
+    try {
+      for await (const item of source) {
+        yield item;
+      }
+      // Pipeline completed successfully
+      tracker.pipelineCompleted();
+    } catch (error) {
+      // Pipeline failed
+      tracker.pipelineError(error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    } finally {
+      await source.return?.(undefined);
+    }
+  })();
 }
 
 /**
