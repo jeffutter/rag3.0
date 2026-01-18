@@ -1,10 +1,7 @@
 import { z } from "zod";
 import { createLogger } from "../../core/logging/logger";
 import { createStep } from "../../core/pipeline/steps";
-import {
-	type SparseEmbeddingResult,
-	generateSparseEmbeddings,
-} from "../../lib/sparse-embeddings";
+import { generateSparseEmbeddings } from "../../lib/sparse-embeddings";
 
 const logger = createLogger("generate-sparse-embeddings-step");
 
@@ -12,33 +9,29 @@ const logger = createLogger("generate-sparse-embeddings-step");
  * Input schema for the Generate Sparse Embeddings step.
  */
 const GenerateSparseEmbeddingsInputSchema = z.object({
-	contents: z.array(z.string()).min(1),
-	endpoint: z.string().url().optional(),
+  contents: z.array(z.string()).min(1),
+  endpoint: z.string().url().optional(),
 });
 
 /**
  * Schema for individual sparse embedding results.
  */
 const SparseEmbeddingSchema = z.object({
-	embedding: z.object({
-		values: z.array(z.number()),
-		indices: z.array(z.number()),
-	}),
+  embedding: z.object({
+    values: z.array(z.number()),
+    indices: z.array(z.number()),
+  }),
 });
 
 /**
  * Output schema for the Generate Sparse Embeddings step.
  */
 const GenerateSparseEmbeddingsOutputSchema = z.object({
-	embeddings: z.array(SparseEmbeddingSchema),
+  embeddings: z.array(SparseEmbeddingSchema),
 });
 
-type GenerateSparseEmbeddingsInput = z.input<
-	typeof GenerateSparseEmbeddingsInputSchema
->;
-type GenerateSparseEmbeddingsOutput = z.infer<
-	typeof GenerateSparseEmbeddingsOutputSchema
->;
+type GenerateSparseEmbeddingsInput = z.input<typeof GenerateSparseEmbeddingsInputSchema>;
+type GenerateSparseEmbeddingsOutput = z.infer<typeof GenerateSparseEmbeddingsOutputSchema>;
 
 /**
  * Generate Sparse Embeddings step for pipeline.
@@ -68,62 +61,48 @@ type GenerateSparseEmbeddingsOutput = z.infer<
  * });
  * ```
  */
-export const generateSparseEmbeddingsStep = createStep<
-	GenerateSparseEmbeddingsInput,
-	GenerateSparseEmbeddingsOutput
->(
-	"generateSparseEmbeddings",
-	async ({ input }) => {
-		logger.debug({
-			event: "step_start",
-			contentCount: input.contents.length,
-			endpoint: input.endpoint,
-		});
+export const generateSparseEmbeddingsStep = createStep<GenerateSparseEmbeddingsInput, GenerateSparseEmbeddingsOutput>(
+  "generateSparseEmbeddings",
+  async ({ input }) => {
+    logger.debug({
+      event: "step_start",
+      contentCount: input.contents.length,
+      endpoint: input.endpoint,
+    });
 
-		// Validate input
-		const validated = GenerateSparseEmbeddingsInputSchema.parse(input);
+    // Validate input
+    const validated = GenerateSparseEmbeddingsInputSchema.parse(input);
 
-		logger.trace({
-			event: "step_input_validated",
-			contentCount: validated.contents.length,
-			contentLengths: validated.contents.map((c) => c.length),
-			endpoint: validated.endpoint,
-		});
+    logger.trace({
+      event: "step_input_validated",
+      contentCount: validated.contents.length,
+      contentLengths: validated.contents.map((c) => c.length),
+      endpoint: validated.endpoint,
+    });
 
-		// Call the utility function to generate sparse embeddings
-		const embeddings = await generateSparseEmbeddings(
-			validated.contents,
-			validated.endpoint,
-		);
+    // Call the utility function to generate sparse embeddings
+    const embeddings = await generateSparseEmbeddings(validated.contents, validated.endpoint);
 
-		logger.debug({
-			event: "step_complete",
-			embeddingCount: embeddings.length,
-			sparsitySummary: embeddings.map((e) => ({
-				nonZeroCount: e.embedding.values.length,
-				indicesCount: e.embedding.indices.length,
-			})),
-		});
+    logger.debug({
+      event: "step_complete",
+      embeddingCount: embeddings.length,
+      sparsitySummary: embeddings.map((e) => ({
+        nonZeroCount: e.embedding.values.length,
+        indicesCount: e.embedding.indices.length,
+      })),
+    });
 
-		return { embeddings };
-	},
-	{
-		retry: {
-			maxAttempts: 3,
-			backoffMs: 1000,
-			retryableErrors: [
-				"ECONNRESET",
-				"ETIMEDOUT",
-				"ECONNREFUSED",
-				"RATE_LIMIT",
-			],
-		},
-	},
+    return { embeddings };
+  },
+  {
+    retry: {
+      maxAttempts: 3,
+      backoffMs: 1000,
+      retryableErrors: ["ECONNRESET", "ETIMEDOUT", "ECONNREFUSED", "RATE_LIMIT"],
+    },
+  },
 );
 
 // Export schemas for testing and validation
-export {
-	GenerateSparseEmbeddingsInputSchema,
-	GenerateSparseEmbeddingsOutputSchema,
-};
+export { GenerateSparseEmbeddingsInputSchema, GenerateSparseEmbeddingsOutputSchema };
 export type { GenerateSparseEmbeddingsInput, GenerateSparseEmbeddingsOutput };

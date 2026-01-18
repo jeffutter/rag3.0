@@ -1,0 +1,3 @@
+[test]
+# Preload script to configure test environment
+preload = ["./src/test-preload.ts"]

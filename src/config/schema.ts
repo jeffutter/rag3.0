@@ -28,13 +28,15 @@ export const configSchema = z.object({
     .optional()
     .default({}),
 
-  reranker: z.object({
-    baseURL: z.string(),
-    model: z.string().optional(),
-    apiKey: z.string().optional(),
-    useInstructions: z.boolean().optional().default(false),
-    instructions: z.string().optional(),
-  }),
+  reranker: z
+    .object({
+      baseURL: z.string(),
+      model: z.string().optional(),
+      apiKey: z.string().optional(),
+      useInstructions: z.boolean().optional().default(false),
+      instructions: z.string().optional(),
+    })
+    .optional(),
 
   qdrant: z.object({
     url: z.string(),

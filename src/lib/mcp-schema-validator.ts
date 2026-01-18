@@ -11,7 +11,7 @@ const logger = createLogger("mcp-schema-validator");
  * Normalizes JSON Schema to use standard formats.
  * Replaces non-standard formats like "uint" with standard JSON Schema types.
  */
-function normalizeSchemaForValidation(schema: any): any {
+function normalizeSchemaForValidation(schema: unknown): unknown {
   if (!schema || typeof schema !== "object") {
     return schema;
   }
@@ -22,7 +22,7 @@ function normalizeSchemaForValidation(schema: any): any {
   }
 
   // Clone to avoid mutation
-  const normalized = { ...schema };
+  const normalized = { ...schema } as Record<string, unknown>;
 
   // Replace non-standard "uint" format with standard integer + minimum constraint
   if (normalized.format === "uint") {
@@ -67,6 +67,6 @@ export class NormalizingJsonSchemaValidator implements jsonSchemaValidator {
     });
 
     // Get the inner validator with the normalized schema
-    return this.innerValidator.getValidator<T>(normalizedSchema);
+    return this.innerValidator.getValidator<T>(normalizedSchema as JsonSchemaType);
   }
 }

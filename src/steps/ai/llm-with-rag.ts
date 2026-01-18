@@ -1,11 +1,11 @@
 import { createLogger } from "../../core/logging/logger";
 import { createStep } from "../../core/pipeline/steps";
+import { MCPHTTPClient, type MCPServerConfig } from "../../lib/mcp-http-client";
+import { loadMCPTools } from "../../lib/mcp-tool-adapter";
 import type { ObsidianVaultUtilityClient } from "../../lib/obsidian-vault-utility-client";
 import type { OpenAICompatibleClient } from "../../llm/openai-client";
 import type { CompletionResponse, ToolDefinition } from "../../llm/types";
 import type { VectorSearchClient } from "../../retrieval/qdrant-client";
-import { MCPHTTPClient, type MCPServerConfig } from "../../lib/mcp-http-client";
-import { loadMCPTools } from "../../lib/mcp-tool-adapter";
 import { createRAGSearchTool } from "../../tools/rag-search";
 
 const logger = createLogger("llm-with-rag-step");
@@ -65,7 +65,7 @@ export const llmWithRAGStep = createStep<
   });
 
   // Collect all tools (RAG + MCP)
-  const tools: ToolDefinition[] = [ragTool as any];
+  const tools: ToolDefinition[] = [ragTool as ToolDefinition];
 
   // Load MCP tools if configured
   if (context.mcpServers && context.mcpServers.length > 0) {

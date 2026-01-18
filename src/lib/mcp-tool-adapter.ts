@@ -12,10 +12,10 @@ const logger = createLogger("mcp-tool-adapter");
  */
 function jsonSchemaToZod(schema: {
   type: string;
-  properties?: Record<string, any> | undefined;
+  properties?: Record<string, unknown> | undefined;
   required?: string[] | undefined;
-  items?: any;
-  enum?: any[];
+  items?: unknown;
+  enum?: unknown[];
   [key: string]: unknown;
 }): z.ZodTypeAny {
   const description = schema.description as string | undefined;
@@ -57,7 +57,7 @@ function jsonSchemaToZod(schema: {
 
     case "array": {
       if (schema.items) {
-        const itemSchema = jsonSchemaToZod(schema.items);
+        const itemSchema = jsonSchemaToZod(schema.items as typeof schema);
         let arrayType = z.array(itemSchema);
         if (description) {
           arrayType = arrayType.describe(description);
@@ -91,7 +91,7 @@ function jsonSchemaToZod(schema: {
   const zodShape: Record<string, z.ZodTypeAny> = {};
 
   for (const [key, propSchema] of Object.entries(properties)) {
-    const prop = propSchema as any;
+    const prop = propSchema as typeof schema;
     let zodType = jsonSchemaToZod(prop);
 
     // Make optional if not required
@@ -115,7 +115,7 @@ export function createToolFromMCP(
     description?: string | undefined;
     inputSchema: {
       type: string;
-      properties?: Record<string, any> | undefined;
+      properties?: Record<string, unknown> | undefined;
       required?: string[] | undefined;
       [key: string]: unknown;
     };
@@ -133,7 +133,7 @@ export function createToolFromMCP(
     name: mcpTool.name,
     description: mcpTool.description || `MCP tool: ${mcpTool.name}`,
     parameters,
-    execute: async (args: any) => {
+    execute: async (args: unknown) => {
       logger.debug({
         event: "executing_mcp_tool",
         toolName: mcpTool.name,
@@ -141,7 +141,7 @@ export function createToolFromMCP(
       });
 
       try {
-        const result = await mcpClient.callTool(mcpTool.name, args);
+        const result = await mcpClient.callTool(mcpTool.name, args as Record<string, unknown>);
 
         // Extract text content from MCP response
         // MCP tools return content as an array of content items

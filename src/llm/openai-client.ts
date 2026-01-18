@@ -106,9 +106,9 @@ export class OpenAICompatibleClient implements LLMClient {
     if (process.env.LOG_CURL === "true") {
       const curlCommand = formatAsCurl({
         baseURL: this.baseURL,
-        apiKey: this.apiKey,
+        ...(this.apiKey && { apiKey: this.apiKey }),
         endpoint: "/v1/chat/completions",
-        body: createParams,
+        body: createParams as unknown as Record<string, unknown>,
       });
 
       logger.info({

@@ -11,16 +11,23 @@ import { getSanitizeOptionsFromEnv, sanitizeForLogging } from "./sanitizer.js";
  * - Minimal overhead in production
  * - Compact, readable formats for development (via LOG_FORMAT)
  * - Smart truncation of large objects/arrays for readability
+ * - Auto-silenced during tests (set LOG_LEVEL explicitly to override)
  */
 
+// Detect if running in Bun test environment
+// Check for the global marker set by the test preload script
+const isBunTest = (globalThis as { __BUN_TEST__?: boolean }).__BUN_TEST__ === true;
 const isDev = process.env.NODE_ENV !== "production";
 const sanitizeEnabled = process.env.LOG_SANITIZE !== "false";
 const sanitizeOptions = getSanitizeOptionsFromEnv();
 const logFormat = (process.env.LOG_FORMAT || "compact") as LogFormat | "pretty";
 
+// Default to silent during tests unless LOG_LEVEL is explicitly set
+const defaultLevel = isBunTest ? "silent" : "info";
+
 // Base logger configuration
 const baseConfig = {
-  level: process.env.LOG_LEVEL || "info",
+  level: process.env.LOG_LEVEL || defaultLevel,
 
   // Use standard OpenTelemetry field names for future compatibility
   messageKey: "msg",

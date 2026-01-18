@@ -4,6 +4,7 @@ import { runCLI } from "./io/cli";
 import { MCPHTTPClient } from "./lib/mcp-http-client";
 import { loadMCPTools } from "./lib/mcp-tool-adapter";
 import { createObsidianVaultUtilityClient } from "./lib/obsidian-vault-utility-client";
+import type { RerankConfig } from "./lib/reranker";
 import { OpenAICompatibleClient } from "./llm/openai-client";
 import { VectorSearchClient } from "./retrieval/qdrant-client";
 import { createRAGSearchTool } from "./tools/rag-search";
@@ -25,7 +26,7 @@ async function main() {
       embeddingModel: config.embedding.model,
       qdrantURL: config.qdrant.url,
       qdrantCollection: config.qdrant.defaultCollection,
-      sparseEmbeddingEndpoint: config.sparseEmbedding.endpoint
+      sparseEmbeddingEndpoint: config.sparseEmbedding.endpoint,
     });
 
     // Initialize LLM client
@@ -72,32 +73,18 @@ async function main() {
       embeddingConfig.apiKey = config.embedding.apiKey;
     }
 
-    // Initialize reranker config
-    const rerankConfig: {
-      baseURL: string;
-      model?: string;
-      apiKey?: string;
-      useInstructions?: boolean;
-      instructions?: string;
-    } = {
-      baseURL: config.reranker.baseURL,
-    };
-
-    if (config.reranker.model) {
-      rerankConfig.model = config.reranker.model;
-    }
-
-    if (config.reranker.apiKey) {
-      rerankConfig.apiKey = config.reranker.apiKey;
-    }
-
-    if (config.reranker.useInstructions !== undefined) {
-      rerankConfig.useInstructions = config.reranker.useInstructions;
-    }
-
-    if (config.reranker.instructions) {
-      rerankConfig.instructions = config.reranker.instructions;
-    }
+    // Initialize reranker config (optional)
+    const rerankConfig: RerankConfig | undefined = config.reranker
+      ? {
+          baseURL: config.reranker.baseURL,
+          ...(config.reranker.model !== undefined && { model: config.reranker.model }),
+          ...(config.reranker.apiKey !== undefined && { apiKey: config.reranker.apiKey }),
+          ...(config.reranker.useInstructions !== undefined && {
+            useInstructions: config.reranker.useInstructions,
+          }),
+          ...(config.reranker.instructions !== undefined && { instructions: config.reranker.instructions }),
+        }
+      : undefined;
 
     // Initialize Obsidian Vault Utility client
     const vaultClient = createObsidianVaultUtilityClient({
@@ -110,10 +97,8 @@ async function main() {
     const ragSearchTool = await createRAGSearchTool({
       vectorClient,
       embeddingConfig,
-      ...(config.sparseEmbedding?.endpoint
-        ? { sparseEmbeddingEndpoint: config.sparseEmbedding.endpoint }
-        : {}),
-      rerankConfig,
+      ...(config.sparseEmbedding?.endpoint ? { sparseEmbeddingEndpoint: config.sparseEmbedding.endpoint } : {}),
+      ...(rerankConfig !== undefined && { rerankConfig }),
       defaultCollection: config.qdrant.defaultCollection,
       vaultClient,
     });

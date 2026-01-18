@@ -11,7 +11,7 @@ const logger = createLogger("mcp-http-client");
  * Replaces non-standard formats like "uint" with standard JSON Schema types.
  * Handles nested schemas including $defs.
  */
-function normalizeSchema(schema: any): any {
+function normalizeSchema(schema: unknown): unknown {
   if (!schema || typeof schema !== "object") {
     return schema;
   }
@@ -22,7 +22,7 @@ function normalizeSchema(schema: any): any {
   }
 
   // Clone the object to avoid mutation
-  const normalized = { ...schema };
+  const normalized = { ...schema } as Record<string, unknown>;
 
   // Replace non-standard "uint" format with standard integer + minimum constraint
   if (normalized.format === "uint") {
@@ -117,7 +117,7 @@ export class MCPHTTPClient {
       });
 
       // Cast transport to satisfy exactOptionalPropertyTypes
-      await this.client.connect(this.transport as any);
+      await this.client.connect(this.transport as unknown as Parameters<typeof this.client.connect>[0]);
       this.connected = true;
 
       const serverInfo = this.client.getServerVersion();
@@ -158,7 +158,12 @@ export class MCPHTTPClient {
       // Normalize tool schemas to use standard JSON Schema formats
       const normalizedTools = response.tools.map((tool) => ({
         ...tool,
-        inputSchema: normalizeSchema(tool.inputSchema),
+        inputSchema: normalizeSchema(tool.inputSchema) as {
+          type: string;
+          properties?: Record<string, unknown> | undefined;
+          required?: string[] | undefined;
+          [key: string]: unknown;
+        },
       }));
 
       logger.debug({
