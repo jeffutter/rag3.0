@@ -7,6 +7,7 @@ import { createObsidianVaultUtilityClient } from "./lib/obsidian-vault-utility-c
 import type { RerankConfig } from "./lib/reranker";
 import { OpenAICompatibleClient } from "./llm/openai-client";
 import { VectorSearchClient } from "./retrieval/qdrant-client";
+import { createFileReadTool } from "./tools/file-read";
 import { createRAGSearchTool } from "./tools/rag-search";
 import { ToolRegistry } from "./tools/registry";
 import { createTagSearchTool } from "./tools/tag-search";
@@ -105,6 +106,12 @@ async function main() {
     });
 
     toolRegistry.register(ragSearchTool);
+
+    const fileReadTool = createFileReadTool({
+      vaultClient,
+    });
+
+    toolRegistry.register(fileReadTool);
 
     const tagSearchTool = createTagSearchTool({
       vaultClient,

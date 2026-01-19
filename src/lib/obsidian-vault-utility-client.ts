@@ -18,6 +18,15 @@ const tagsResponseSchema = z.object({
 });
 
 /**
+ * Response schema for the file read endpoint
+ */
+const fileReadResponseSchema = z.object({
+  content: z.string(),
+  path: z.string(),
+  modified: z.string().optional(), // ISO timestamp
+});
+
+/**
  * File match with tags
  */
 export interface FileWithTags {
@@ -85,6 +94,58 @@ export class ObsidianVaultUtilityClient {
     } catch (error) {
       logger.error({
         event: "tags_fetch_error",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Reads the content of a file from the vault
+   * @param path - Path to the file relative to vault root
+   * @returns File content and metadata
+   */
+  async getFileContent(path: string): Promise<{
+    content: string;
+    path: string;
+    modified?: string | undefined;
+  }> {
+    const url = `${this.baseURL}/api/file?path=${encodeURIComponent(path)}`;
+
+    logger.debug({
+      event: "fetching_file",
+      url,
+      path,
+    });
+
+    try {
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error(`File not found: ${path}`);
+        }
+        logger.error({
+          event: "file_fetch_failed",
+          status: response.status,
+          statusText: response.statusText,
+        });
+        throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const parsed = fileReadResponseSchema.parse(data);
+
+      logger.info({
+        event: "file_fetched",
+        path: parsed.path,
+        contentLength: parsed.content.length,
+      });
+
+      return parsed;
+    } catch (error) {
+      logger.error({
+        event: "file_fetch_error",
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
