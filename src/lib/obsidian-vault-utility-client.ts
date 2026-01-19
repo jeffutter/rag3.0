@@ -39,7 +39,7 @@ export interface FileTreeNode {
  * Response schema for the file tree endpoint
  */
 const _fileTreeResponseSchema = z.object({
-  vault: z.record(z.any()), // Recursive structure validated at runtime
+  vault: z.record(z.string(), z.any()), // Recursive structure validated at runtime
 });
 
 /**

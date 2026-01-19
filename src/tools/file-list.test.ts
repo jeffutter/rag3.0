@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { ObsidianVaultUtilityClient } from "../lib/obsidian-vault-utility-client";
 import { createObsidianVaultUtilityClient } from "../lib/obsidian-vault-utility-client";
-import { createFileListTool } from "./file-list";
+import { createFileListTool, type FileListResult } from "./file-list";
 
 describe("File List Tool", () => {
   // This test requires a running Obsidian Vault Utility server
@@ -34,7 +34,7 @@ describe("File List Tool", () => {
       vaultClient: mockVaultClient as ObsidianVaultUtilityClient,
     });
 
-    const result = await fileListTool.execute({ folder: "/invalid/path" });
+    const result = (await fileListTool.execute({ folder: "/invalid/path", includeFiles: true })) as FileListResult;
 
     expect(result.status).toBe("error");
     expect(result.message).toContain("leading slash");
@@ -58,7 +58,7 @@ describe("File List Tool", () => {
       vaultClient: mockVaultClient as ObsidianVaultUtilityClient,
     });
 
-    const result = await fileListTool.execute({ folder: "NonexistentFolder" });
+    const result = (await fileListTool.execute({ folder: "NonexistentFolder", includeFiles: true })) as FileListResult;
 
     expect(result.status).toBe("not_found");
   });
@@ -87,12 +87,14 @@ describe("File List Tool", () => {
       vaultClient: mockVaultClient as ObsidianVaultUtilityClient,
     });
 
-    const result = await fileListTool.execute({ folder: "Projects" });
+    const result = (await fileListTool.execute({ folder: "Projects", includeFiles: true })) as FileListResult;
 
     expect(result.status).toBe("success");
     expect(result.tree).toBeDefined();
-    expect(result.tree?.Projects).toBeDefined();
-    expect(result.tree?.Projects.files).toContain("plan.md");
+    if (result.tree && "Projects" in result.tree) {
+      expect(result.tree.Projects).toBeDefined();
+      expect(result.tree.Projects.files).toContain("plan.md");
+    }
   });
 
   test("can list without files for large vaults", async () => {
@@ -115,7 +117,7 @@ describe("File List Tool", () => {
       vaultClient: mockVaultClient as ObsidianVaultUtilityClient,
     });
 
-    const result = await fileListTool.execute({ includeFiles: false });
+    const result = (await fileListTool.execute({ includeFiles: false })) as FileListResult;
 
     expect(result.status).toBe("success");
     expect(result.tree?.vault?.files).toBeUndefined();

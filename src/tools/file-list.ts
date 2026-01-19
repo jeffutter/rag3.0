@@ -45,7 +45,7 @@ export interface FileListResult {
   status: "success" | "not_found" | "error";
   tree?: { vault: FileTreeNode } | { [folder: string]: FileTreeNode };
   truncated?: boolean;
-  message?: string;
+  message?: string | undefined;
 }
 
 /**
