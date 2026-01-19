@@ -80,7 +80,8 @@
       "WebFetch(domain:zod.dev)",
       "WebSearch",
       "Bash(bd dep add:*)",
-      "Bash(bd dep remove:*)"
+      "Bash(bd dep remove:*)",
+      "Bash(awk:*)"
     ],
     "deny": [],
     "ask": []

@@ -7,6 +7,7 @@ import { createObsidianVaultUtilityClient } from "./lib/obsidian-vault-utility-c
 import type { RerankConfig } from "./lib/reranker";
 import { OpenAICompatibleClient } from "./llm/openai-client";
 import { VectorSearchClient } from "./retrieval/qdrant-client";
+import { createFileListTool } from "./tools/file-list";
 import { createFileReadTool } from "./tools/file-read";
 import { createRAGSearchTool } from "./tools/rag-search";
 import { ToolRegistry } from "./tools/registry";
@@ -118,6 +119,12 @@ async function main() {
     });
 
     toolRegistry.register(tagSearchTool);
+
+    const fileListTool = createFileListTool({
+      vaultClient,
+    });
+
+    toolRegistry.register(fileListTool);
 
     // Track MCP clients for cleanup
     const mcpClients: MCPHTTPClient[] = [];
