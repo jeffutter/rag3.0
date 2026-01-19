@@ -13,6 +13,7 @@ async function executeTagSearch(
   tool: ReturnType<typeof createTagSearchTool>,
   args: PartialTagSearchArgs,
 ): Promise<TagSearchResult> {
+  // biome-ignore lint/suspicious/noExplicitAny: Test helper needs to accept partial args
   return (await tool.execute(args as any)) as TagSearchResult;
 }
 
@@ -33,7 +34,7 @@ describe("Tag Search Tool", () => {
 
   test("finds files with OR operator (default)", async () => {
     const mockVaultClient = {
-      searchByTags: async (tags: string[], operator: string) => {
+      searchByTags: async (_tags: string[], operator: string) => {
         expect(operator).toBe("or");
         return [
           { path: "notes/meeting-2024-01-15.md", tags: ["meeting", "work"], modified: "2024-01-15T10:00:00Z" },
@@ -43,6 +44,7 @@ describe("Tag Search Tool", () => {
     };
 
     const tagSearchTool = createTagSearchTool({
+      // biome-ignore lint/suspicious/noExplicitAny: Test mock with partial interface
       vaultClient: mockVaultClient as any,
     });
 
@@ -69,6 +71,7 @@ describe("Tag Search Tool", () => {
     };
 
     const tagSearchTool = createTagSearchTool({
+      // biome-ignore lint/suspicious/noExplicitAny: Test mock with partial interface
       vaultClient: mockVaultClient as any,
     });
 
@@ -88,6 +91,7 @@ describe("Tag Search Tool", () => {
     };
 
     const tagSearchTool = createTagSearchTool({
+      // biome-ignore lint/suspicious/noExplicitAny: Test mock with partial interface
       vaultClient: mockVaultClient as any,
     });
 
@@ -108,6 +112,7 @@ describe("Tag Search Tool", () => {
     };
 
     const tagSearchTool = createTagSearchTool({
+      // biome-ignore lint/suspicious/noExplicitAny: Test mock with partial interface
       vaultClient: mockVaultClient as any,
     });
 
@@ -128,6 +133,7 @@ describe("Tag Search Tool", () => {
     };
 
     const tagSearchTool = createTagSearchTool({
+      // biome-ignore lint/suspicious/noExplicitAny: Test mock with partial interface
       vaultClient: mockVaultClient as any,
     });
 
@@ -149,6 +155,7 @@ describe("Tag Search Tool", () => {
     };
 
     const tagSearchTool = createTagSearchTool({
+      // biome-ignore lint/suspicious/noExplicitAny: Test mock with partial interface
       vaultClient: mockVaultClient as any,
     });
 
@@ -172,6 +179,7 @@ describe("Tag Search Tool", () => {
     };
 
     const tagSearchTool = createTagSearchTool({
+      // biome-ignore lint/suspicious/noExplicitAny: Test mock with partial interface
       vaultClient: mockVaultClient as any,
     });
 
@@ -187,6 +195,7 @@ describe("Tag Search Tool", () => {
     };
 
     const tagSearchTool = createTagSearchTool({
+      // biome-ignore lint/suspicious/noExplicitAny: Test mock with partial interface
       vaultClient: mockVaultClient as any,
     });
 
@@ -204,6 +213,7 @@ describe("Tag Search Tool", () => {
     };
 
     const tagSearchTool = createTagSearchTool({
+      // biome-ignore lint/suspicious/noExplicitAny: Test mock with partial interface
       vaultClient: mockVaultClient as any,
     });
 
@@ -221,6 +231,7 @@ describe("Tag Search Tool", () => {
     };
 
     const tagSearchTool = createTagSearchTool({
+      // biome-ignore lint/suspicious/noExplicitAny: Test mock with partial interface
       vaultClient: mockVaultClient as any,
     });
 
