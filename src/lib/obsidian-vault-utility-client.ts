@@ -18,6 +18,28 @@ const tagsResponseSchema = z.object({
 });
 
 /**
+ * File match with tags
+ */
+export interface FileWithTags {
+  path: string;
+  tags: string[];
+  modified?: string | undefined;
+}
+
+/**
+ * Response schema for the files-by-tags endpoint
+ */
+const filesByTagsResponseSchema = z.object({
+  files: z.array(
+    z.object({
+      path: z.string(),
+      tags: z.array(z.string()),
+      modified: z.string().optional(),
+    }),
+  ),
+});
+
+/**
  * Client for interacting with the Obsidian Vault Utility API
  */
 export class ObsidianVaultUtilityClient {
@@ -63,6 +85,56 @@ export class ObsidianVaultUtilityClient {
     } catch (error) {
       logger.error({
         event: "tags_fetch_error",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Searches for files that match the specified tags
+   * @param tags - Array of tags to search for
+   * @param operator - "and" for files with ALL tags, "or" for files with ANY tag
+   * @returns Array of files with their tags
+   */
+  async searchByTags(tags: string[], operator: "and" | "or" = "or"): Promise<FileWithTags[]> {
+    const url = new URL(`${this.baseURL}/api/files-by-tags`);
+    url.searchParams.set("tags", tags.join(","));
+    url.searchParams.set("operator", operator);
+
+    logger.debug({
+      event: "searching_files_by_tags",
+      url: url.toString(),
+      tags,
+      operator,
+    });
+
+    try {
+      const response = await fetch(url.toString());
+
+      if (!response.ok) {
+        logger.error({
+          event: "files_by_tags_fetch_failed",
+          status: response.status,
+          statusText: response.statusText,
+        });
+        throw new Error(`Failed to search files by tags: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const parsed = filesByTagsResponseSchema.parse(data);
+
+      logger.info({
+        event: "files_by_tags_fetched",
+        count: parsed.files.length,
+        tags,
+        operator,
+      });
+
+      return parsed.files;
+    } catch (error) {
+      logger.error({
+        event: "files_by_tags_fetch_error",
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;

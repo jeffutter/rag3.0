@@ -8,6 +8,7 @@ import type { RerankConfig } from "./lib/reranker";
 import { OpenAICompatibleClient } from "./llm/openai-client";
 import { VectorSearchClient } from "./retrieval/qdrant-client";
 import { createRAGSearchTool } from "./tools/rag-search";
+import { createTagSearchTool } from "./tools/tag-search";
 import { ToolRegistry } from "./tools/registry";
 
 const logger = createLogger("main");
@@ -104,6 +105,12 @@ async function main() {
     });
 
     toolRegistry.register(ragSearchTool);
+
+    const tagSearchTool = createTagSearchTool({
+      vaultClient,
+    });
+
+    toolRegistry.register(tagSearchTool);
 
     // Track MCP clients for cleanup
     const mcpClients: MCPHTTPClient[] = [];
