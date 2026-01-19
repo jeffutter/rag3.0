@@ -78,14 +78,15 @@
       "WebFetch(domain:qdrant.tech)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:zod.dev)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(bd dep add:*)",
+      "Bash(bd dep remove:*)"
     ],
     "deny": [],
     "ask": []
   },
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": [
-  ],
+  "enabledMcpjsonServers": [],
   "hooks": {
     "PostToolUse": [
       {
