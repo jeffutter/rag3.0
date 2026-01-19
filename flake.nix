@@ -4,7 +4,6 @@
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
-    backlog.url = "github:MrLesk/Backlog.md";
     vibe.url = "github:mistralai/mistral-vibe";
   };
 
@@ -13,7 +12,6 @@
       self,
       nixpkgs,
       flake-utils,
-      backlog,
       vibe,
     }:
     flake-utils.lib.eachDefaultSystem (
@@ -25,7 +23,6 @@
         # Development shell
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
-            backlog.outputs.packages.${system}.default
             vibe.outputs.packages.${system}.default
             bun
             biome
