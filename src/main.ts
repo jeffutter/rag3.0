@@ -11,6 +11,7 @@ import { createFileListTool } from "./tools/file-list";
 import { createFileReadTool } from "./tools/file-read";
 import { createRAGSearchTool } from "./tools/rag-search";
 import { ToolRegistry } from "./tools/registry";
+import { createTagListTool } from "./tools/tag-list";
 import { createTagSearchTool } from "./tools/tag-search";
 
 const logger = createLogger("main");
@@ -125,6 +126,12 @@ async function main() {
     });
 
     toolRegistry.register(fileListTool);
+
+    const tagListTool = createTagListTool({
+      vaultClient,
+    });
+
+    toolRegistry.register(tagListTool);
 
     // Track MCP clients for cleanup
     const mcpClients: MCPHTTPClient[] = [];

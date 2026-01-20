@@ -27,6 +27,26 @@ const fileReadResponseSchema = z.object({
 });
 
 /**
+ * Tag entry with document count
+ */
+export interface TagWithCount {
+  tag: string;
+  documentCount: number;
+}
+
+/**
+ * Response schema for the tags with counts endpoint
+ */
+const tagsWithCountsResponseSchema = z.object({
+  tags: z.array(
+    z.object({
+      tag: z.string(),
+      documentCount: z.number(),
+    }),
+  ),
+});
+
+/**
  * File tree node structure matching the obsidian-copilot format
  */
 export interface FileTreeNode {
@@ -110,6 +130,48 @@ export class ObsidianVaultUtilityClient {
     } catch (error) {
       logger.error({
         event: "tags_fetch_error",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Fetches all tags from the vault with their document counts
+   * @returns Array of tags with the number of documents referencing each
+   */
+  async getTagsWithCounts(): Promise<TagWithCount[]> {
+    const url = `${this.baseURL}/api/tags-with-counts`;
+
+    logger.debug({
+      event: "fetching_tags_with_counts",
+      url,
+    });
+
+    try {
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        logger.error({
+          event: "tags_with_counts_fetch_failed",
+          status: response.status,
+          statusText: response.statusText,
+        });
+        throw new Error(`Failed to fetch tags with counts: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const parsed = tagsWithCountsResponseSchema.parse(data);
+
+      logger.info({
+        event: "tags_with_counts_fetched",
+        count: parsed.tags.length,
+      });
+
+      return parsed.tags;
+    } catch (error) {
+      logger.error({
+        event: "tags_with_counts_fetch_error",
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
